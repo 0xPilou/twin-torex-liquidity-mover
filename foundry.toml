@@ -23,6 +23,7 @@ remappings = [
   'forge-gas-snapshot/=lib/permit2/lib/forge-gas-snapshot/src/',
   'permit2/=lib/permit2/',
   'automate/=lib/automate/contracts/',
+  '@uniswap/v3-core=lib/v3-core',
 ]
 
 [profile.ci]
