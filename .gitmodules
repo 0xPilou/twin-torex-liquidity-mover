@@ -9,3 +9,6 @@
 [submodule "lib/automate"]
 	path = lib/automate
 	url = https://github.com/gelatodigital/automate
+[submodule "lib/superfluid-protocol-monorepo"]
+	path = lib/superfluid-protocol-monorepo
+	url = https://github.com/superfluid-finance/protocol-monorepo
