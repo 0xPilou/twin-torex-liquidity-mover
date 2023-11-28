@@ -1,2 +1,4 @@
-@prb/test/=lib/prb-test/src/
+automate/=lib/automate/contracts/
+ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
+prb-test/=lib/prb-test/src/
