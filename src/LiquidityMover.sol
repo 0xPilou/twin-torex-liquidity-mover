@@ -56,6 +56,7 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
     receive() external payable { }
 
     // TODO: Pass in profit margin?
+    // TODO: Pass in reward receiver?
     function moveLiquidity(Torex torex) public {
         ISuperToken inToken = torex.getInToken();
 
@@ -72,7 +73,7 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         // Note that this function can still be used with Gelato's 1Balance.
     }
 
-    // TODO: implement
+    // TODO: Implement the part where we pay Gelato and send rest to the reward receiver.
     function moveLiquiditySelfPaying(Torex torex) external onlyDedicatedMsgSender {
         this.moveLiquidity(torex);
 
@@ -135,13 +136,14 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
 
         // # Swap
         // TODO: This part could be decoupled into an abstract base class?
+        // Single swap guide about Swap Router: https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps
         TransferHelper.safeApprove(
             address(inTokenNormalized), address(swapRouter), inTokenNormalized.balanceOf(address(this))
         );
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
             tokenIn: address(inTokenNormalized),
             tokenOut: address(outTokenNormalized),
-            fee: poolFee,
+            fee: poolFee, // TODO: this should be passed in?
             recipient: address(this),
             deadline: block.timestamp,
             // decimals need to be handled here
@@ -175,18 +177,23 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         // ---
 
         // # Pay Profit
-        // TODO: will depend on whether self-paying or not
+        // TODO: will depend on whether self-paying or not?
+
+        // pass out inTokenNormalized
+        // pass out inAmountNormalized
+        // pass out usedInAmount
     }
 
     function getSuperTokenType(ISuperToken superToken) private view returns (SuperTokenType) {
-        if (superToken.getUnderlyingToken() != address(0)) {
-            // TODO: A few Native Asset Super Tokens have an underlying token?
-            return SuperTokenType.Wrapper;
+        // TODO: Test if this works.
+        (bool isNativeAssetSuperToken,) =
+            address(superToken).staticcall(abi.encodeWithSelector(ISETHCustom.upgradeByETH.selector));
+        if (isNativeAssetSuperToken) {
+            return SuperTokenType.NativeAsset;
         } else {
-            // TODO: Test if this works.
-            (bool success,) = address(superToken).staticcall(abi.encodeWithSelector(ISETHCustom.upgradeByETH.selector));
-            if (success) {
-                return SuperTokenType.NativeAsset;
+            if (superToken.getUnderlyingToken() != address(0)) {
+                // TODO: A few Native Asset Super Tokens have an underlying token?
+                return SuperTokenType.Wrapper;
             } else {
                 return SuperTokenType.Pure;
             }
