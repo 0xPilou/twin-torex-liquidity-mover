@@ -25,6 +25,7 @@ remappings = [
   'automate/=lib/automate/contracts/',
   '@uniswap/v3-core=lib/v3-core',
   '@uniswap/v3-periphery=lib/v3-periphery',
+  '@prb/test/=lib/prb-test/src/',
 ]
 
 [profile.ci]
