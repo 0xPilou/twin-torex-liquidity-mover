@@ -27,10 +27,10 @@ interface Torex {
 
 contract LiquidityMover is AutomateReady, ILiquidityMover {
     ISwapRouter public immutable swapRouter;
-    IWETH9 public immutable WETH;
+    IWETH9 public immutable WETH; // TODO: This might change in time?
 
     // For this example, we will set the pool fee to 0.3%.
-    uint24 public constant poolFee = 3000;
+    uint24 public constant poolFee = 3000; // TODO: Get this from TOREX's pool?
 
     constructor(
         ISwapRouter _swapRouter,
@@ -46,21 +46,17 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
 
     receive() external payable { }
 
+    // TODO: Pass in profit margin?
     function moveLiquidity(Torex torex) public {
-        (uint256 fee, address feeToken) = _getFeeDetails();
-
-        // take minimum profit as input
-
         ISuperToken inToken = torex.getInToken();
-        // ISuperToken outToken = torex.getOutToken();
 
-        uint256 inTokenBalance = inToken.balanceOf(address(torex));
+        uint256 maxInAmount = inToken.balanceOf(address(torex));
         uint256 minOutAmount = torex.getMinOutAmount(inTokenBalance);
 
-        torex.moveLiquidity(inTokenBalance, minOutAmount);
+        torex.moveLiquidity(maxInAmount, minOutAmount);
 
         // swap to USDC or ETH
-
+        (uint256 fee, address feeToken) = _getFeeDetails();
         _transfer(fee, feeToken);
     }
 
@@ -77,10 +73,8 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         // here.
         Torex torex = Torex(msg.sender);
 
-
         // IUniswapV3Pool uniswapV3Pool = torex.getUniswapV3Pool(); // better to get in and out token from here?
         // Probably not, because I don't know the direction.
-
 
         // # Normalize In and Out Tokens
         // It means unwrapping and converting them to an ERC-20 that the swap router understands.
@@ -96,7 +90,8 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
             WETH.deposit{ value: inAmount }();
             inTokenNormalized = WETH;
             inAmountNormalized = inAmount; // TODO: is it correct to assume 18 decimals for native asset?
-        } else { // Pure Super Token
+        } else {
+            // Pure Super Token
             inTokenNormalized = IERC20(inToken);
             inAmountNormalized = inAmount;
         }
@@ -110,7 +105,8 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         } else if (outTokenType == SuperTokenType.NativeAsset) {
             outTokenNormalized = WETH;
             outAmountNormalized = outAmount; // TODO: is it correct to assume 18 decimals for native asset?
-        } else { // Pure Super Token
+        } else {
+            // Pure Super Token
             outTokenNormalized = IERC20(outToken);
             outAmountNormalized = outAmount;
         }
@@ -131,7 +127,8 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         });
         uint256 usedInAmount = swapRouter.exactOutputSingle(params);
 
-        // Reset allowance for in token (it's better to reset for tokens like USDT which rever when `approve` is called but allowance is not 0)
+        // Reset allowance for in token (it's better to reset for tokens like USDT which rever when `approve` is called
+        // but allowance is not 0)
         if (usedInAmount < inAmountNormalized) {
             TransferHelper.safeApprove(inTokenNormalized, address(swapRouter), 0);
         }
@@ -141,11 +138,13 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         if (outTokenType == SuperTokenType.Wrapper) {
             // TODO: Is it possible that there could be some remnant allowance here that breaks USDT?
             TransferHelper.safeApprove(address(outTokenNormalized), address(outToken), outAmountNormalized);
-            outToken.upgradeTo(address(torex), outAmount, new bytes(0)); // Note that amount with Super Token decimals (i.e. `outAmount`) should be used here.
+            outToken.upgradeTo(address(torex), outAmount, new bytes(0)); // Note that amount with Super Token decimals
+                // (i.e. `outAmount`) should be used here.
         } else if (outTokenType == SuperTokenType.NativeAsset) {
             WETH.withdraw(outAmountNormalized);
             ISETH(outToken).upgradeByETHTo(address(torex));
-        } else { // Pure Super Token
+        } else {
+            // Pure Super Token
             // `outToken` is same as `outTokenNormalized` in this case
             TransferHelper.safeTransfer(address(outToken), address(torex), outAmount);
         }
