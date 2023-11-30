@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity >=0.8.21;
+pragma solidity =0.8.15; // TODO: Forced this because IWETH9 required 0.8.15.
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -14,7 +14,14 @@ import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/in
 import { ISETHCustom, ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 
 interface ILiquidityMover {
-    function execute(ISuperToken inToken, ISuperToken outToken, uint256 inAmount, uint256 outAmount) external;
+    function execute(
+        ISuperToken inToken,
+        ISuperToken outToken,
+        uint256 inAmount,
+        uint256 outAmount
+    )
+        // bytes calldata ctx
+        external;
 }
 
 interface Torex {
@@ -22,6 +29,8 @@ interface Torex {
     function getInToken() external view returns (ISuperToken);
     function getOutToken() external view returns (ISuperToken);
     function getUniswapV3Pool() external view returns (IUniswapV3Pool);
+
+    // , bytes calldata ctx
     function moveLiquidity(uint256 inAmount, uint256 outAmount) external;
 }
 
@@ -51,7 +60,7 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         ISuperToken inToken = torex.getInToken();
 
         uint256 maxInAmount = inToken.balanceOf(address(torex));
-        uint256 minOutAmount = torex.getMinOutAmount(inTokenBalance);
+        uint256 minOutAmount = torex.getMinOutAmount(maxInAmount);
 
         // (1/2) TODO: Would like to store information here
         // e.g. profit margin
@@ -98,7 +107,7 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
             inTokenNormalized = IERC20(inToken.getUnderlyingToken());
             inAmountNormalized = inTokenNormalized.balanceOf(address(this));
         } else if (inTokenType == SuperTokenType.NativeAsset) {
-            ISETH(inToken).downgradeByETH(inAmount);
+            ISETH(address(inToken)).downgradeToETH(inAmount);
             WETH.deposit{ value: inAmount }();
             inTokenNormalized = WETH;
             inAmountNormalized = inAmount; // TODO: is it correct to assume 18 decimals for native asset?
@@ -113,7 +122,7 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         uint256 outAmountNormalized;
         if (outTokenType == SuperTokenType.Wrapper) {
             outTokenNormalized = IERC20(outToken.getUnderlyingToken());
-            outAmountNormalized = outToken.toUnderlyingAmount(outAmount);
+            (outAmountNormalized,) = outToken.toUnderlyingAmount(outAmount);
         } else if (outTokenType == SuperTokenType.NativeAsset) {
             outTokenNormalized = WETH;
             outAmountNormalized = outAmount; // TODO: is it correct to assume 18 decimals for native asset?
@@ -126,12 +135,14 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
 
         // # Swap
         // TODO: This part could be decoupled into an abstract base class?
-        TransferHelper.safeApprove(inTokenNormalized, address(swapRouter), inTokenNormalized.balanceOf(address(this)));
+        TransferHelper.safeApprove(
+            address(inTokenNormalized), address(swapRouter), inTokenNormalized.balanceOf(address(this))
+        );
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
             tokenIn: address(inTokenNormalized),
-            tokenOut: address(outAmountNormalized),
+            tokenOut: address(outTokenNormalized),
             fee: poolFee,
-            recipient: msg.sender,
+            recipient: address(this),
             deadline: block.timestamp,
             // decimals need to be handled here
             amountOut: outAmountNormalized, // can this amount always be wrapped to the expected out amount?
@@ -143,7 +154,7 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         // Reset allowance for in token (it's better to reset for tokens like USDT which rever when `approve` is called
         // but allowance is not 0)
         if (usedInAmount < inAmountNormalized) {
-            TransferHelper.safeApprove(inTokenNormalized, address(swapRouter), 0);
+            TransferHelper.safeApprove(address(inTokenNormalized), address(swapRouter), 0);
         }
         // ---
 
@@ -155,7 +166,7 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
                 // (i.e. `outAmount`) should be used here.
         } else if (outTokenType == SuperTokenType.NativeAsset) {
             WETH.withdraw(outAmountNormalized);
-            ISETH(outToken).upgradeByETHTo(address(torex));
+            ISETH(address(outToken)).upgradeByETHTo(address(torex));
         } else {
             // Pure Super Token
             // `outToken` is same as `outTokenNormalized` in this case
@@ -182,7 +193,7 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         }
     }
 
-    // Is there a difference is this is nester or not?
+    // Is there a difference whether this is nested or not?
     enum SuperTokenType {
         Pure,
         Wrapper,
