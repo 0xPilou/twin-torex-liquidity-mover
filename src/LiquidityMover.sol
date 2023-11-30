@@ -53,7 +53,19 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         uint256 maxInAmount = inToken.balanceOf(address(torex));
         uint256 minOutAmount = torex.getMinOutAmount(inTokenBalance);
 
+        // (1/2) TODO: Would like to store information here
+        // e.g. profit margin
+
         torex.moveLiquidity(maxInAmount, minOutAmount);
+
+        // (2/2) TODO: And retrieve it here, possibly with added data from `moveLiquidity`
+        // use-case is to handle Gelato self-pay and send the profit to the user
+        // Note that this function can still be used with Gelato's 1Balance.
+    }
+
+    // TODO: implement
+    function moveLiquiditySelfPaying(Torex torex) external onlyDedicatedMsgSender {
+        this.moveLiquidity(torex);
 
         // swap to USDC or ETH
         (uint256 fee, address feeToken) = _getFeeDetails();
@@ -113,6 +125,7 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         // ---
 
         // # Swap
+        // TODO: This part could be decoupled into an abstract base class?
         TransferHelper.safeApprove(inTokenNormalized, address(swapRouter), inTokenNormalized.balanceOf(address(this)));
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
             tokenIn: address(inTokenNormalized),
@@ -149,12 +162,17 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
             TransferHelper.safeTransfer(address(outToken), address(torex), outAmount);
         }
         // ---
+
+        // # Pay Profit
+        // TODO: will depend on whether self-paying or not
     }
 
     function getSuperTokenType(ISuperToken superToken) private view returns (SuperTokenType) {
         if (superToken.getUnderlyingToken() != address(0)) {
+            // TODO: A few Native Asset Super Tokens have an underlying token?
             return SuperTokenType.Wrapper;
         } else {
+            // TODO: Test if this works.
             (bool success,) = address(superToken).staticcall(abi.encodeWithSelector(ISETHCustom.upgradeByETH.selector));
             if (success) {
                 return SuperTokenType.NativeAsset;
@@ -164,6 +182,7 @@ contract LiquidityMover is AutomateReady, ILiquidityMover {
         }
     }
 
+    // Is there a difference is this is nester or not?
     enum SuperTokenType {
         Pure,
         Wrapper,
