@@ -6,6 +6,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import { TransferHelper } from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 import { ISwapRouter } from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import { IPeripheryImmutableState } from "@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol";
 import { IWETH9 } from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
 
 import { AutomateReady } from "automate/integrations/AutomateReady.sol";
@@ -26,13 +27,15 @@ interface Torex {
     function moveLiquidity(uint256 inAmount, uint256 outAmount) external;
 }
 
+interface IUniswapSwapRouter is ISwapRouter, IPeripheryImmutableState { }
+
 contract UniswapLiquidityMover is AutomateReady, ILiquidityMover {
     ISwapRouter public immutable swapRouter;
     IWETH9 public immutable WETH; // TODO: This might change in time?
     // TODO: Specify Native Asset Super Token here?
 
     // For this example, we will set the pool fee to 0.3%.
-    uint24 public constant poolFee = 3000; // TODO: Get this from TOREX's pool?
+    // uint24 public constant poolFee = 3000; // TODO: Get this from TOREX's pool?
 
     // Define a struct to hold your key-value pairs
     struct OnlyDuringTransactionData {
@@ -48,16 +51,15 @@ contract UniswapLiquidityMover is AutomateReady, ILiquidityMover {
     OnlyDuringTransactionData private duringTransactionData;
 
     constructor(
-        ISwapRouter _swapRouter,
-        // TODO: decimals for WETH?
-        IWETH9 _WETH,
+        IUniswapSwapRouter _swapRouter, // TODO: Technically this could be inherited from.
+        // TODO: decimals for ETH?
         address _automate,
         address _taskCreator
     )
         AutomateReady(_automate, _taskCreator)
     {
         swapRouter = _swapRouter;
-        WETH = _WETH;
+        WETH = IWETH9(_swapRouter.WETH9());
     }
 
     // TODO: Pass in profit margin?
@@ -162,7 +164,7 @@ contract UniswapLiquidityMover is AutomateReady, ILiquidityMover {
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
             tokenIn: address(inTokenForSwap),
             tokenOut: address(outTokenForSwap),
-            fee: poolFee, // TODO: this should be passed in?
+            fee: torex.getUniswapV3Pool().fee(), // TODO: this should be passed in? TODO2: I don't like this.
             recipient: address(this),
             deadline: block.timestamp,
             // decimals need to be handled here
