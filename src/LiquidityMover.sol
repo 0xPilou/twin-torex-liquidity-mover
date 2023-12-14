@@ -19,10 +19,10 @@ interface ILiquidityMover {
 }
 
 interface Torex {
-    function getMinOutAmount(uint256 inAmount) external view returns (uint256);
-    function getInToken() external view returns (ISuperToken);
-    function getOutToken() external view returns (ISuperToken);
-    function getUniswapV3Pool() external view returns (IUniswapV3Pool);
+    function inToken() external view returns (ISuperToken);
+    function outToken() external view returns (ISuperToken);
+    function uniswapPool() external view returns (IUniswapV3Pool);
+    function getBenchmarkPrice() external view returns (uint256);
 
     function moveLiquidity(uint256 inAmount, uint256 outAmount) external;
 }
@@ -33,6 +33,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
     // , AutomateReady
     ISwapRouter public immutable swapRouter;
     IWETH9 public immutable WETH; // TODO: This might change in time?
+    ISETH public immutable SETH; // TODO: This might change in time?
     // TODO: Specify Native Asset Super Token here?
 
     // For this example, we will set the pool fee to 0.3%.
@@ -52,25 +53,27 @@ contract UniswapLiquidityMover is ILiquidityMover {
     OnlyDuringTransactionData private duringTransactionData;
 
     constructor(
-        IUniswapSwapRouter _swapRouter // TODO: Technically this could be inherited from.
+        IUniswapSwapRouter _swapRouter, // TODO: Technically this could be inherited from.
             // Uniswap addresses available here: https://docs.uniswap.org/contracts/v3/reference/deployments (e.g.
             // 0xE592427A0AEce92De3Edee1F18E0157C05861564 for swap router)
             // address _automate,
             // address _taskCreator
+        ISETH _nativeAssetSuperToken
     ) {
         // AutomateReady(_automate, _taskCreator)
         swapRouter = _swapRouter;
         WETH = IWETH9(_swapRouter.WETH9());
+        SETH = _nativeAssetSuperToken; // TODO: Get this from the protcol?
     }
 
     // TODO: Pass in profit margin?
     // TODO: Pass in Uniswap v3 pool with fee?
     // TODO: lock for re-entrancy
     function moveLiquidity(Torex torex, address rewardAddress, uint256 minRewardAmount) public {
-        ISuperToken inToken = torex.getInToken();
+        ISuperToken inToken = torex.inToken();
 
         uint256 maxInAmount = inToken.balanceOf(address(torex));
-        uint256 minOutAmount = torex.getMinOutAmount(maxInAmount);
+        uint256 minOutAmount = torex.getBenchmarkPrice() * maxInAmount; // TODO: anything to do with safe math here?
 
         duringTransactionData = OnlyDuringTransactionData({
             torex: torex,
@@ -165,7 +168,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
             tokenIn: address(inTokenForSwap),
             tokenOut: address(outTokenForSwap),
-            fee: torex.getUniswapV3Pool().fee(), // TODO: this should be passed in? TODO2: I don't like this.
+            fee: torex.uniswapPool().fee(), // TODO: this should be passed in? TODO2: I don't like this.
             recipient: address(this),
             deadline: block.timestamp,
             // decimals need to be handled here
@@ -202,7 +205,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         duringTransactionData = OnlyDuringTransactionData({
             torex: torex,
             inTokenNormalized: inTokenForSwap,
-            inAmountForSwap: inAmountForSwap,
+            inAmountForSwap: inAmountForSwap,   
             inAmountUsedForSwap: inAmountUsedForSwap
         });
     }
@@ -215,9 +218,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
 
     function getSuperTokenType(ISuperToken superToken) private view returns (SuperTokenType, address) {
         // TODO: Allow for optimization from off-chain set-up?
-        bool isNativeAssetSuperToken;
-        (isNativeAssetSuperToken,) =
-            address(superToken).staticcall(abi.encodeWithSelector(ISETHCustom.upgradeByETH.selector));
+        bool isNativeAssetSuperToken = address(superToken) == address(SETH);
         if (isNativeAssetSuperToken) {
             return (SuperTokenType.NativeAsset, address(0));
             // Note that there are a few exceptions where Native Asset Super Tokens have an underlying token,
