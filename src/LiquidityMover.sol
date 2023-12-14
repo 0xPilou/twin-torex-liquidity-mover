@@ -29,7 +29,8 @@ interface Torex {
 
 interface IUniswapSwapRouter is ISwapRouter, IPeripheryImmutableState { }
 
-contract UniswapLiquidityMover is AutomateReady, ILiquidityMover {
+contract UniswapLiquidityMover is ILiquidityMover {
+    // , AutomateReady
     ISwapRouter public immutable swapRouter;
     IWETH9 public immutable WETH; // TODO: This might change in time?
     // TODO: Specify Native Asset Super Token here?
@@ -51,13 +52,13 @@ contract UniswapLiquidityMover is AutomateReady, ILiquidityMover {
     OnlyDuringTransactionData private duringTransactionData;
 
     constructor(
-        IUniswapSwapRouter _swapRouter, // TODO: Technically this could be inherited from.
-        // TODO: decimals for ETH?
-        address _automate,
-        address _taskCreator
-    )
-        AutomateReady(_automate, _taskCreator)
-    {
+        IUniswapSwapRouter _swapRouter // TODO: Technically this could be inherited from.
+            // Uniswap addresses available here: https://docs.uniswap.org/contracts/v3/reference/deployments (e.g.
+            // 0xE592427A0AEce92De3Edee1F18E0157C05861564 for swap router)
+            // address _automate,
+            // address _taskCreator
+    ) {
+        // AutomateReady(_automate, _taskCreator)
         swapRouter = _swapRouter;
         WETH = IWETH9(_swapRouter.WETH9());
     }
@@ -131,7 +132,7 @@ contract UniswapLiquidityMover is AutomateReady, ILiquidityMover {
             WETH.deposit{ value: inAmount }();
             inTokenForSwap = WETH;
             inAmountForSwap = inAmount;
-            // TODO: is it correct to assume 18 decimals for native asset? No, not correct. Actually, it might be...
+            // Assuming 18 decimals for the native asset.
         } else {
             // Pure Super Token
             inTokenForSwap = IERC20(inToken);
