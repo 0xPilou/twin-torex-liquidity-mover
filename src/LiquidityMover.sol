@@ -68,11 +68,11 @@ contract UniswapLiquidityMover is ILiquidityMover {
     // TODO: Pass in profit margin?
     // TODO: Pass in Uniswap v3 pool with fee?
     // TODO: lock for re-entrancy
-    function moveLiquidity(Torex torex, address rewardAddress, uint256 minRewardAmount) public {
+    function moveLiquidity(Torex torex, address rewardAddress, uint256 minRewardAmount, uint8 amountDivisor) public {
         ISuperToken inToken = torex.inToken();
 
-        uint256 maxInAmount = inToken.balanceOf(address(torex));
-        uint256 minOutAmount = torex.getBenchmarkPrice() * torex.inToken().balanceOf(address(torex));
+        uint256 maxInAmount = inToken.balanceOf(address(torex)) / amountDivisor;
+        uint256 minOutAmount = torex.getBenchmarkPrice() * torex.inToken().balanceOf(address(torex)) / amountDivisor;
         // TODO: anything to do with safe math here?
 
         transientStorage = TransientStorage({
