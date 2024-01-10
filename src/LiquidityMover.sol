@@ -40,17 +40,16 @@ contract UniswapLiquidityMover is ILiquidityMover {
     // uint24 public constant poolFee = 3000; // TODO: Get this from TOREX's pool?
 
     // Define a struct to hold your key-value pairs
-    struct OnlyDuringTransactionData {
+    struct TransientStorage {
         Torex torex;
         IERC20 inTokenNormalized;
         uint256 inAmountForSwap;
         uint256 inAmountUsedForSwap;
     }
-    // TODO: use amounts without sign?
 
-    // Define a state variable to store the data
-    // Not a fan of "ephemeral". I'd prefer another name that signifies better "only during transaction data".
-    OnlyDuringTransactionData private duringTransactionData;
+    // Note that this storage should be emptied by the end of each transaction.
+    // Named after: https://eips.ethereum.org/EIPS/eip-1153
+    TransientStorage private transientStorage;
 
     constructor(
         IUniswapSwapRouter _swapRouter, // TODO: Technically this could be inherited from.
@@ -73,9 +72,10 @@ contract UniswapLiquidityMover is ILiquidityMover {
         ISuperToken inToken = torex.inToken();
 
         uint256 maxInAmount = inToken.balanceOf(address(torex));
-        uint256 minOutAmount = torex.getBenchmarkPrice() * maxInAmount; // TODO: anything to do with safe math here?
+        uint256 minOutAmount = torex.getBenchmarkPrice() * torex.inToken().balanceOf(address(torex));
+        // TODO: anything to do with safe math here?
 
-        duringTransactionData = OnlyDuringTransactionData({
+        transientStorage = TransientStorage({
             torex: torex,
             inTokenNormalized: IERC20(address(0)),
             inAmountForSwap: 0,
@@ -84,12 +84,12 @@ contract UniswapLiquidityMover is ILiquidityMover {
 
         torex.moveLiquidity(maxInAmount, minOutAmount);
 
-        uint256 reward = duringTransactionData.inAmountForSwap - duringTransactionData.inAmountUsedForSwap;
+        uint256 reward = transientStorage.inAmountForSwap - transientStorage.inAmountUsedForSwap;
         require(reward >= minRewardAmount, "LiquidityMover: reward too low");
 
-        duringTransactionData.inTokenNormalized.transfer(rewardAddress, reward);
+        transientStorage.inTokenNormalized.transfer(rewardAddress, reward);
 
-        delete duringTransactionData;
+        delete transientStorage;
     }
 
     // TODO: Implement the part where we pay Gelato and send rest to the reward receiver.
@@ -115,7 +115,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         // The expectation is that TOREX calls this contract when liquidity movement is happening and transfers inTokens
         // here.
 
-        Torex torex = duringTransactionData.torex;
+        Torex torex = transientStorage.torex;
         require(address(torex) == msg.sender, "LiquidityMover: expecting caller to be TOREX");
 
         // # Normalize In and Out Tokens
@@ -150,7 +150,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
             (outAmountForSwap,) = outToken.toUnderlyingAmount(outAmount);
         } else if (outTokenType == SuperTokenType.NativeAsset) {
             outTokenForSwap = WETH;
-            outAmountForSwap = outAmount; // TODO: is it correct to assume 18 decimals for native asset?
+            outAmountForSwap = outAmount;
+            // Assuming 18 decimals for the native asset.
         } else {
             // Pure Super Token
             outTokenForSwap = IERC20(outToken);
@@ -202,10 +203,10 @@ contract UniswapLiquidityMover is ILiquidityMover {
         // ---
 
         // # Pay Profit
-        duringTransactionData = OnlyDuringTransactionData({
+        transientStorage = TransientStorage({
             torex: torex,
             inTokenNormalized: inTokenForSwap,
-            inAmountForSwap: inAmountForSwap,   
+            inAmountForSwap: inAmountForSwap,
             inAmountUsedForSwap: inAmountUsedForSwap
         });
     }
