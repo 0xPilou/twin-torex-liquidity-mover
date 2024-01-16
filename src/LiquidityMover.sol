@@ -21,7 +21,7 @@ interface ILiquidityMover {
 interface Torex {
     function inToken() external view returns (ISuperToken);
     function outToken() external view returns (ISuperToken);
-    function uniswapPool() external view returns (IUniswapV3Pool);
+    function uniV3Pool() external view returns (IUniswapV3Pool);
     function getBenchmarkPrice() external view returns (uint256);
 
     function moveLiquidity(uint256 inAmount, uint256 outAmount) external;
@@ -174,7 +174,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
             tokenIn: address(inTokenForSwap),
             tokenOut: address(outTokenForSwap),
-            fee: torex.uniswapPool().fee(), // TODO: this should be passed in? TODO2: I don't like this.
+            fee: torex.uniV3Pool().fee(), // TODO: this should be passed in? TODO2: I don't like this.
             recipient: address(this),
             deadline: block.timestamp,
             // decimals need to be handled here
