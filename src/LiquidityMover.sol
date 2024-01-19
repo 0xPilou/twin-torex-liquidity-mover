@@ -70,7 +70,15 @@ contract UniswapLiquidityMover is ILiquidityMover {
     // TODO: Pass in profit margin?
     // TODO: Pass in Uniswap v3 pool with fee?
     // TODO: lock for re-entrancy
-    function moveLiquidity(Torex torex, address rewardAddress, uint256 minRewardAmount, uint8 amountDivisor) public {
+    function moveLiquidity(
+        Torex torex,
+        address rewardAddress,
+        uint256 minRewardAmount,
+        uint8 amountDivisor
+    )
+        public
+        returns (bool)
+    {
         ISuperToken inToken = torex.inToken();
 
         // TODO: don't allow 0
@@ -95,6 +103,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
         transientStorage.inTokenNormalized.transfer(rewardAddress, reward);
 
         delete transientStorage;
+
+        return true;
     }
 
     // TODO: Implement the part where we pay Gelato and send rest to the reward receiver.
@@ -167,26 +177,30 @@ contract UniswapLiquidityMover is ILiquidityMover {
         // # Swap
         // TODO: This part could be decoupled into an abstract base class?
         // Single swap guide about Swap Router: https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps
-        TransferHelper.safeApprove(
-            address(inTokenForSwap), address(swapRouter), inTokenForSwap.balanceOf(address(this))
-        );
+        uint256 inTokenForSwapBalance = inTokenForSwap.balanceOf(address(this));
+        TransferHelper.safeApprove(address(inTokenForSwap), address(swapRouter), inTokenForSwapBalance);
 
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
             tokenIn: address(inTokenForSwap),
             tokenOut: address(outTokenForSwap),
-            fee: torex.uniV3Pool().fee(), // TODO: this should be passed in? TODO2: I don't like this.
+            fee: torex.uniV3Pool().fee(),
             recipient: address(this),
             deadline: block.timestamp,
-            // decimals need to be handled here
             amountOut: outAmountForSwap, // can this amount always be wrapped to the expected out amount?
-            amountInMaximum: inTokenForSwap.balanceOf(address(this)), // TODO: can this be slightly optimized?
+            amountInMaximum: inTokenForSwapBalance,
             sqrtPriceLimitX96: 0
         });
-        uint256 inAmountUsedForSwap = swapRouter.exactOutputSingle(params);
+
+        transientStorage = TransientStorage({
+            torex: torex,
+            inTokenNormalized: inTokenForSwap,
+            inAmountForSwap: inAmountForSwap,
+            inAmountUsedForSwap: swapRouter.exactOutputSingle(params)
+        });
 
         // Reset allowance for in token (it's better to reset for tokens like USDT which rever when `approve` is called
         // but allowance is not 0)
-        if (inAmountUsedForSwap < inAmountForSwap) {
+        if (transientStorage.inAmountUsedForSwap < inAmountForSwap) {
             TransferHelper.safeApprove(address(inTokenForSwap), address(swapRouter), 0);
         }
         // ---
@@ -206,14 +220,6 @@ contract UniswapLiquidityMover is ILiquidityMover {
             TransferHelper.safeTransfer(address(outToken), address(torex), outAmount);
         }
         // ---
-
-        // # Pay Profit
-        transientStorage = TransientStorage({
-            torex: torex,
-            inTokenNormalized: inTokenForSwap,
-            inAmountForSwap: inAmountForSwap,
-            inAmountUsedForSwap: inAmountUsedForSwap
-        });
     }
 
     enum SuperTokenType {
