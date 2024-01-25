@@ -8,7 +8,9 @@ import { console2 } from "forge-std/console2.sol";
 import { StdCheats } from "forge-std/StdCheats.sol";
 import { ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 
-import { ILiquidityMover, UniswapLiquidityMover, IUniswapSwapRouter, Torex } from "../src/LiquidityMover.sol";
+import {
+    ILiquidityMover, UniswapLiquidityMover, IUniswapSwapRouter, Torex, CoreConfig
+} from "../src/LiquidityMover.sol";
 
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 
@@ -37,7 +39,9 @@ contract FooTest is PRBTest {
         });
 
         Torex torex = Torex(0xA18cDB16562d9ebB5dB2dc599c14a9A1062b6DB9);
-        IUniswapV3Pool uniV3Pool = torex.uniV3Pool();
+        CoreConfig memory torexConfig = torex.getCoreConfig();
+
+        IUniswapV3Pool uniV3Pool = torexConfig.uniV3Pool;
         emit LogAddress(address(uniV3Pool));
 
         sut = new UniswapLiquidityMover(
@@ -45,8 +49,8 @@ contract FooTest is PRBTest {
             ISETH(0x96B82B65ACF7072eFEb00502F45757F254c2a0D4)
         );
 
-        ISuperToken inToken = torex.inToken();
-        ISuperToken outToken = torex.outToken();
+        ISuperToken inToken = torexConfig.inToken;
+        ISuperToken outToken = torexConfig.outToken;
         emit LogAddress(address(inToken));
         emit LogAddress(address(outToken));
 

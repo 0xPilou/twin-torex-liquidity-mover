@@ -18,11 +18,33 @@ interface ILiquidityMover {
     function execute(ISuperToken inToken, ISuperToken outToken, uint256 inAmount, uint256 outAmount) external;
 }
 
+// TorexCore.CoreConfig memory cc = torexArray[i].getCoreConfig();
+
+struct CoreConfig {
+    address host;
+    ISuperToken inToken;
+    ISuperToken outToken;
+    // Scaling factor between inToken flowrate and units assigned in the GDA pool for outToken distribution.
+    uint128 outTokenDistributionPoolScaler;
+    // Discount model factor, see getDiscountModelFactor function.
+    uint256 discountModelFactor;
+    // Uniswap V3 Pool TWAP Oracle Configurations
+    //
+    /// The Uniswap V3 pool to be used as price benchmark for liquidity moving.
+    IUniswapV3Pool uniV3Pool;
+    /// Uniswap pool is bi-direction but torex is not. If false, inToken maps to token0, and vice versa.
+    bool uniV3PoolInverseOrder;
+    /// Scaler used for the quotes from the pool.
+    // Scaler
+    bool uniV3QuoteScaler;
+}
+
 interface Torex {
-    function inToken() external view returns (ISuperToken);
-    function outToken() external view returns (ISuperToken);
-    function uniV3Pool() external view returns (IUniswapV3Pool);
+    // function inToken() external view returns (ISuperToken);
+    // function outToken() external view returns (ISuperToken);
+    // function uniV3Pool() external view returns (IUniswapV3Pool);
     function getBenchmarkQuote(uint256 inAmount) external view returns (uint256);
+    function getCoreConfig() external view returns (CoreConfig memory);
 
     function moveLiquidity(uint256 inAmount, uint256 outAmount) external;
 }
@@ -45,6 +67,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         IERC20 inTokenNormalized;
         uint256 inAmountForSwap;
         uint256 inAmountUsedForSwap;
+        CoreConfig torexConfig;
     }
 
     // Note that this storage should be emptied by the end of each transaction.
@@ -77,11 +100,11 @@ contract UniswapLiquidityMover is ILiquidityMover {
         public
         returns (bool)
     {
-        ISuperToken inToken = torex.inToken();
+        CoreConfig memory torexConfig = torex.getCoreConfig();
 
         // TODO: don't allow 0?
 
-        uint256 maxInAmount = inToken.balanceOf(address(torex)) / amountDivisor;
+        uint256 maxInAmount = torexConfig.inToken.balanceOf(address(torex)) / amountDivisor;
         // TODO: anything to do with safe math here?
 
         uint256 minOutAmount = torex.getBenchmarkQuote(maxInAmount);
@@ -90,7 +113,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
             torex: torex,
             inTokenNormalized: IERC20(address(0)),
             inAmountForSwap: 0,
-            inAmountUsedForSwap: 0
+            inAmountUsedForSwap: 0,
+            torexConfig: torexConfig
         });
 
         torex.moveLiquidity(maxInAmount, minOutAmount);
@@ -181,7 +205,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
             tokenIn: address(inTokenForSwap),
             tokenOut: address(outTokenForSwap),
-            fee: torex.uniV3Pool().fee(),
+            fee: transientStorage.torexConfig.uniV3Pool.fee(),
             recipient: address(this),
             deadline: block.timestamp,
             amountOut: outAmountForSwap, // can this amount always be wrapped to the expected out amount?
@@ -193,7 +217,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
             torex: torex,
             inTokenNormalized: inTokenForSwap,
             inAmountForSwap: inAmountForSwap,
-            inAmountUsedForSwap: swapRouter.exactOutputSingle(params)
+            inAmountUsedForSwap: swapRouter.exactOutputSingle(params),
+            torexConfig: transientStorage.torexConfig
         });
 
         // Reset allowance for in token (it's better to reset for tokens like USDT which rever when `approve` is called
