@@ -33,10 +33,10 @@ contract FooTest is PRBTest {
         // Otherwise, run the test against the mainnet fork.
         vm.createSelectFork({
             urlOrAlias: "https://polygon-mumbai.g.alchemy.com/v2/Ra72TykU9ohKJ99Np3E7T-n-crUM1cuU",
-            blockNumber: 44_939_008
+            blockNumber: 45_149_005
         });
 
-        Torex torex = Torex(0xC3b4Cb65BBf415cF10C1aE6C67F773CA2A7bb518);
+        Torex torex = Torex(0xA18cDB16562d9ebB5dB2dc599c14a9A1062b6DB9);
         IUniswapV3Pool uniV3Pool = torex.uniV3Pool();
         emit LogAddress(address(uniV3Pool));
 
@@ -54,17 +54,11 @@ contract FooTest is PRBTest {
         assertGt(torexInAmount, 0);
         emit LogUint256(torexInAmount);
 
-        uint256 torexBenchmarkPrice = torex.getBenchmarkPrice();
-        uint256 torexBenchmarkScaled = uint256(ONE_IN_Q32_96) * 100 / torexBenchmarkPrice;
+        uint256 torexMinOutAmount = torex.getBenchmarkQuote(torexInAmount);
 
-        // don't use the `torexBenchmarkScaled` to emulate actual contract better
-        uint256 torexInAmountScaled = torexInAmount * uint256(ONE_IN_Q32_96) / torexBenchmarkPrice;
+        emit LogUint256(torexMinOutAmount);
 
-        emit LogUint256(torexBenchmarkPrice);
-        emit LogUint256(torexBenchmarkScaled);
-        emit LogUint256(torexInAmountScaled);
-
-        assertGt(torexBenchmarkPrice, 0);
+        assertGt(torexMinOutAmount, 0);
 
         bool isSuccess = sut.moveLiquidity(torex, address(0), 0, 1);
 

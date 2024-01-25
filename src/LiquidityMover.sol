@@ -22,7 +22,7 @@ interface Torex {
     function inToken() external view returns (ISuperToken);
     function outToken() external view returns (ISuperToken);
     function uniV3Pool() external view returns (IUniswapV3Pool);
-    function getBenchmarkPrice() external view returns (uint256);
+    function getBenchmarkQuote(uint256 inAmount) external view returns (uint256);
 
     function moveLiquidity(uint256 inAmount, uint256 outAmount) external;
 }
@@ -35,8 +35,6 @@ contract UniswapLiquidityMover is ILiquidityMover {
     IWETH9 public immutable WETH; // TODO: This might change in time?
     ISETH public immutable SETH; // TODO: This might change in time?
         // TODO: Specify Native Asset Super Token here?
-
-    uint128 private constant ONE_IN_Q32_96 = 1 << 96;
 
     // For this example, we will set the pool fee to 0.3%.
     // uint24 public constant poolFee = 3000; // TODO: Get this from TOREX's pool?
@@ -81,12 +79,12 @@ contract UniswapLiquidityMover is ILiquidityMover {
     {
         ISuperToken inToken = torex.inToken();
 
-        // TODO: don't allow 0
+        // TODO: don't allow 0?
 
         uint256 maxInAmount = inToken.balanceOf(address(torex)) / amountDivisor;
-        uint256 minOutAmount = torex.inToken().balanceOf(address(torex)) * uint256(ONE_IN_Q32_96)
-            / torex.getBenchmarkPrice() / amountDivisor;
         // TODO: anything to do with safe math here?
+
+        uint256 minOutAmount = torex.getBenchmarkQuote(maxInAmount);
 
         transientStorage = TransientStorage({
             torex: torex,
