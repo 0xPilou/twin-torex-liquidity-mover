@@ -17,8 +17,6 @@ import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/in
 contract FooTest is PRBTest {
     UniswapLiquidityMover internal sut;
 
-    uint128 private constant ONE_IN_Q32_96 = 1 << 96;
-
     function setUp() public virtual {
         // sut = new UniswapLiquidityMover(
         //     IUniswapSwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564),
@@ -35,7 +33,7 @@ contract FooTest is PRBTest {
         // Otherwise, run the test against the mainnet fork.
         vm.createSelectFork({
             urlOrAlias: "https://polygon-mumbai.g.alchemy.com/v2/Ra72TykU9ohKJ99Np3E7T-n-crUM1cuU",
-            blockNumber: 45_149_005
+            blockNumber: 45_152_375
         });
 
         Torex torex = Torex(0xA18cDB16562d9ebB5dB2dc599c14a9A1062b6DB9);
@@ -64,7 +62,7 @@ contract FooTest is PRBTest {
 
         assertGt(torexMinOutAmount, 0);
 
-        bool isSuccess = sut.moveLiquidity(torex, address(0), 0, 1);
+        bool isSuccess = sut.moveLiquidity(torex, address(0x7269B0c7C831598465a9EB17F6c5a03331353dAF), 0, 1);
 
         assertTrue(isSuccess);
     }
