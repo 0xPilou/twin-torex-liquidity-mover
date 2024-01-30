@@ -62,8 +62,17 @@ contract FooTest is PRBTest {
 
         assertGt(torexMinOutAmount, 0);
 
-        bool isSuccess = sut.moveLiquidity(torex, address(0x7269B0c7C831598465a9EB17F6c5a03331353dAF), 0, 1);
+        address randomRewardAddress = address(0xa5F402E7B32aBf648C9B0638bb0FAb275AA445b7);
+        bool isSuccess = sut.moveLiquidity(torex, randomRewardAddress, 0, 1);
 
         assertTrue(isSuccess);
+        assertEq(inToken.balanceOf(address(torex)), 0);
+
+        emit LogUint256(inToken.balanceOf(address(randomRewardAddress)));
+
+
+        assertTrue(isSuccess);
+
+        // assertGt(inToken.balanceOf(address(randomRewardAddress)), 0);
     }
 }
