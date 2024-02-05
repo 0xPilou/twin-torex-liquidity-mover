@@ -33,10 +33,10 @@ contract FooTest is PRBTest {
         // Otherwise, run the test against the mainnet fork.
         vm.createSelectFork({
             urlOrAlias: "https://polygon-mumbai.g.alchemy.com/v2/Ra72TykU9ohKJ99Np3E7T-n-crUM1cuU",
-            blockNumber: 45_152_375
+            blockNumber: 45_512_500
         });
 
-        Torex torex = Torex(0xA18cDB16562d9ebB5dB2dc599c14a9A1062b6DB9);
+        Torex torex = Torex(0x538c4975c301435b5be915673046F7663E4c0b47);
         CoreConfig memory torexConfig = torex.getCoreConfig();
 
         IUniswapV3Pool uniV3Pool = torexConfig.uniV3Pool;
@@ -63,13 +63,12 @@ contract FooTest is PRBTest {
         assertGt(torexMinOutAmount, 0);
 
         address randomRewardAddress = address(0xa5F402E7B32aBf648C9B0638bb0FAb275AA445b7);
-        bool isSuccess = sut.moveLiquidity(torex, randomRewardAddress, 0, 1);
+        bool isSuccess = sut.moveLiquidity(torex, randomRewardAddress, 0);
 
         assertTrue(isSuccess);
         assertEq(inToken.balanceOf(address(torex)), 0);
 
         emit LogUint256(inToken.balanceOf(address(randomRewardAddress)));
-
 
         assertTrue(isSuccess);
 

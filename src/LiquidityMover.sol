@@ -14,8 +14,26 @@ import { AutomateReady } from "automate/integrations/AutomateReady.sol";
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 import { ISETHCustom, ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 
+/**
+ * @dev Interface for the Liquidity Mover contracts.
+ */
 interface ILiquidityMover {
-    function execute(ISuperToken inToken, ISuperToken outToken, uint256 inAmount, uint256 outAmount) external;
+    /**
+     * @dev Request out token liquidity, given an amount of in token has been already been transferred to the contract.
+     * @param inToken   The in token transferred to the contract.
+     * @param outToken  The out token that is requested.
+     * @param inAmount     The amount of in token that has been transferred to the contract.
+     * @param minOutAmount The amount of out token that is requested.
+     * @return Always true.
+     */
+    function moveLiquidityCallback(
+        ISuperToken inToken,
+        ISuperToken outToken,
+        uint256 inAmount,
+        uint256 minOutAmount
+    )
+        external
+        returns (bool);
 }
 
 // TorexCore.CoreConfig memory cc = torexArray[i].getCoreConfig();
@@ -46,7 +64,7 @@ interface Torex {
     function getBenchmarkQuote(uint256 inAmount) external view returns (uint256);
     function getCoreConfig() external view returns (CoreConfig memory);
 
-    function moveLiquidity(uint256 inAmount, uint256 outAmount) external;
+    function moveLiquidity() external;
 }
 
 interface IUniswapSwapRouter is ISwapRouter, IPeripheryImmutableState { }
@@ -67,7 +85,6 @@ contract UniswapLiquidityMover is ILiquidityMover {
         IERC20 inTokenNormalized;
         uint256 inAmountForSwap;
         uint256 inAmountUsedForSwap;
-        CoreConfig torexConfig;
     }
 
     // Note that this storage should be emptied by the end of each transaction.
@@ -91,33 +108,15 @@ contract UniswapLiquidityMover is ILiquidityMover {
     // TODO: Pass in profit margin?
     // TODO: Pass in Uniswap v3 pool with fee?
     // TODO: lock for re-entrancy
-    function moveLiquidity(
-        Torex torex,
-        address rewardAddress,
-        uint256 minRewardAmount,
-        uint8 amountDivisor
-    )
-        public
-        returns (bool)
-    {
-        CoreConfig memory torexConfig = torex.getCoreConfig();
-
-        // TODO: don't allow 0?
-
-        uint256 maxInAmount = torexConfig.inToken.balanceOf(address(torex)) / amountDivisor;
-        // TODO: anything to do with safe math here?
-
-        uint256 minOutAmount = torex.getBenchmarkQuote(maxInAmount);
-
+    function moveLiquidity(Torex torex, address rewardAddress, uint256 minRewardAmount) public returns (bool) {
         transientStorage = TransientStorage({
             torex: torex,
             inTokenNormalized: IERC20(address(0)),
             inAmountForSwap: 0,
-            inAmountUsedForSwap: 0,
-            torexConfig: torexConfig
+            inAmountUsedForSwap: 0
         });
 
-        torex.moveLiquidity(maxInAmount, minOutAmount);
+        torex.moveLiquidity();
 
         uint256 reward = transientStorage.inAmountForSwap - transientStorage.inAmountUsedForSwap;
         require(reward >= minRewardAmount, "LiquidityMover: reward too low");
@@ -138,7 +137,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
     //     _transfer(fee, feeToken);
     // }
 
-    function execute(
+    function moveLiquidityCallback(
         ISuperToken inToken,
         ISuperToken outToken,
         // TODO: Rename or add comments? Alternative names could be `sentInAmount` and `minOutAmount`.
@@ -148,6 +147,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         // TODO: lock for re-entrancy
         external
         override
+        returns (bool)
     {
         // The expectation is that TOREX calls this contract when liquidity movement is happening and transfers inTokens
         // here.
@@ -205,7 +205,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
             tokenIn: address(inTokenForSwap),
             tokenOut: address(outTokenForSwap),
-            fee: transientStorage.torexConfig.uniV3Pool.fee(),
+            fee: torex.getCoreConfig().uniV3Pool.fee(),
             recipient: address(this),
             deadline: block.timestamp,
             amountOut: outAmountForSwap, // can this amount always be wrapped to the expected out amount?
@@ -217,8 +217,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
             torex: torex,
             inTokenNormalized: inTokenForSwap,
             inAmountForSwap: inAmountForSwap,
-            inAmountUsedForSwap: swapRouter.exactOutputSingle(params),
-            torexConfig: transientStorage.torexConfig
+            inAmountUsedForSwap: swapRouter.exactOutputSingle(params)
         });
 
         // Reset allowance for in token (it's better to reset for tokens like USDT which rever when `approve` is called
@@ -243,6 +242,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
             TransferHelper.safeTransfer(address(outToken), address(torex), outAmount);
         }
         // ---
+
+        return true;
     }
 
     enum SuperTokenType {
