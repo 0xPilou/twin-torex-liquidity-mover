@@ -82,9 +82,11 @@ contract UniswapLiquidityMover is ILiquidityMover {
     // Define a struct to hold your key-value pairs
     struct TransientStorage {
         Torex torex;
-        IERC20 inTokenNormalized;
+        IERC20 inTokenForSwap;
         uint256 inAmountForSwap;
         uint256 inAmountUsedForSwap;
+        IERC20 outTokenForSwap;
+        uint256 outAmountForSwap;
     }
 
     // Note that this storage should be emptied by the end of each transaction.
@@ -102,26 +104,21 @@ contract UniswapLiquidityMover is ILiquidityMover {
         // AutomateReady(_automate, _taskCreator)
         swapRouter = _swapRouter;
         WETH = IWETH9(_swapRouter.WETH9());
-        SETH = _nativeAssetSuperToken; // TODO: Get this from the protcol?
+        SETH = _nativeAssetSuperToken; // TODO: Get this from the protocol?
     }
 
     // TODO: Pass in profit margin?
     // TODO: Pass in Uniswap v3 pool with fee?
     // TODO: lock for re-entrancy
     function moveLiquidity(Torex torex, address rewardAddress, uint256 minRewardAmount) public returns (bool) {
-        transientStorage = TransientStorage({
-            torex: torex,
-            inTokenNormalized: IERC20(address(0)),
-            inAmountForSwap: 0,
-            inAmountUsedForSwap: 0
-        });
+        transientStorage.torex = torex;
 
         torex.moveLiquidity();
 
         uint256 reward = transientStorage.inAmountForSwap - transientStorage.inAmountUsedForSwap;
         require(reward >= minRewardAmount, "LiquidityMover: reward too low");
 
-        transientStorage.inTokenNormalized.transfer(rewardAddress, reward);
+        transientStorage.inTokenForSwap.transfer(rewardAddress, reward);
 
         delete transientStorage;
 
@@ -149,99 +146,92 @@ contract UniswapLiquidityMover is ILiquidityMover {
         override
         returns (bool)
     {
+        TransientStorage memory store = transientStorage;
+
         // The expectation is that TOREX calls this contract when liquidity movement is happening and transfers inTokens
         // here.
-
-        Torex torex = transientStorage.torex;
-        require(address(torex) == msg.sender, "LiquidityMover: expecting caller to be TOREX");
+        require(
+            address(store.torex) != address(0),
+            "LiquidityMover: `moveLiquidityCallback` executed without calling the main function first"
+        );
+        require(address(store.torex) == msg.sender, "LiquidityMover: expecting caller to be TOREX");
 
         // # Normalize In and Out Tokens
         // It means unwrapping and converting them to an ERC-20 that the swap router understands.
         (SuperTokenType inTokenType, address inTokenUnderlyingToken) = getSuperTokenType(inToken);
-        IERC20 inTokenForSwap;
-        uint256 inAmountForSwap;
         if (inTokenType == SuperTokenType.Wrapper) {
             inToken.downgrade(inAmount);
-            inTokenForSwap = IERC20(inTokenUnderlyingToken);
-            inAmountForSwap = inTokenForSwap.balanceOf(address(this));
-            // We use `balanceOf` so we wouldn't need to check for decimals.
-            // Even if there was a previous balance (in case someone sent to this contract),
-            // then we'll just use all of it.
+            store.inTokenForSwap = IERC20(inTokenUnderlyingToken);
         } else if (inTokenType == SuperTokenType.NativeAsset) {
             ISETH(address(inToken)).downgradeToETH(inAmount);
             WETH.deposit{ value: inAmount }();
-            inTokenForSwap = WETH;
-            inAmountForSwap = inAmount;
-            // Assuming 18 decimals for the native asset.
+            store.inTokenForSwap = WETH;
         } else {
             // Pure Super Token
-            inTokenForSwap = IERC20(inToken);
-            inAmountForSwap = inAmount;
+            store.inTokenForSwap = IERC20(inToken);
         }
 
+        // We use `balanceOf` so we wouldn't need to check for decimals.
+        // Even if there was a previous balance (in case someone sent to this contract),
+        // then we'll just use all of it.
+        store.inAmountForSwap = store.inTokenForSwap.balanceOf(address(this));
+
         (SuperTokenType outTokenType, address outTokenUnderlyingToken) = getSuperTokenType(outToken);
-        IERC20 outTokenForSwap;
-        uint256 outAmountForSwap;
         if (outTokenType == SuperTokenType.Wrapper) {
-            outTokenForSwap = IERC20(outTokenUnderlyingToken);
-            (outAmountForSwap,) = outToken.toUnderlyingAmount(outAmount);
+            store.outTokenForSwap = IERC20(outTokenUnderlyingToken);
+            (store.outAmountForSwap,) = outToken.toUnderlyingAmount(outAmount);
         } else if (outTokenType == SuperTokenType.NativeAsset) {
-            outTokenForSwap = WETH;
-            outAmountForSwap = outAmount;
+            store.outTokenForSwap = WETH;
+            store.outAmountForSwap = outAmount;
             // Assuming 18 decimals for the native asset.
         } else {
             // Pure Super Token
-            outTokenForSwap = IERC20(outToken);
-            outAmountForSwap = outAmount;
+            store.outTokenForSwap = IERC20(outToken);
+            store.outAmountForSwap = outAmount;
         }
         // ---
 
         // # Swap
         // TODO: This part could be decoupled into an abstract base class?
         // Single swap guide about Swap Router: https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps
-        uint256 inTokenForSwapBalance = inTokenForSwap.balanceOf(address(this));
-        TransferHelper.safeApprove(address(inTokenForSwap), address(swapRouter), inTokenForSwapBalance);
+        TransferHelper.safeApprove(address(store.inTokenForSwap), address(swapRouter), store.inAmountForSwap);
 
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
-            tokenIn: address(inTokenForSwap),
-            tokenOut: address(outTokenForSwap),
-            fee: torex.getCoreConfig().uniV3Pool.fee(),
+            tokenIn: address(store.inTokenForSwap),
+            tokenOut: address(store.outTokenForSwap),
+            fee: store.torex.getCoreConfig().uniV3Pool.fee(),
             recipient: address(this),
             deadline: block.timestamp,
-            amountOut: outAmountForSwap, // can this amount always be wrapped to the expected out amount?
-            amountInMaximum: inTokenForSwapBalance,
+            amountOut: store.outAmountForSwap,
+            amountInMaximum: store.inAmountForSwap,
             sqrtPriceLimitX96: 0
         });
 
-        transientStorage = TransientStorage({
-            torex: torex,
-            inTokenNormalized: inTokenForSwap,
-            inAmountForSwap: inAmountForSwap,
-            inAmountUsedForSwap: swapRouter.exactOutputSingle(params)
-        });
+        store.inAmountUsedForSwap = swapRouter.exactOutputSingle(params);
 
         // Reset allowance for in token (it's better to reset for tokens like USDT which rever when `approve` is called
         // but allowance is not 0)
-        if (transientStorage.inAmountUsedForSwap < inAmountForSwap) {
-            TransferHelper.safeApprove(address(inTokenForSwap), address(swapRouter), 0);
+        if (store.inAmountUsedForSwap < store.inAmountForSwap) {
+            TransferHelper.safeApprove(address(store.inTokenForSwap), address(swapRouter), 0);
         }
         // ---
 
         // # Pay TOREX
         if (outTokenType == SuperTokenType.Wrapper) {
             // TODO: Is it possible that there could be some remnant allowance here that breaks USDT?
-            TransferHelper.safeApprove(address(outTokenForSwap), address(outToken), outAmountForSwap);
-            outToken.upgradeTo(address(torex), outAmount, new bytes(0));
+            TransferHelper.safeApprove(address(store.outTokenForSwap), address(outToken), store.outAmountForSwap);
+            outToken.upgradeTo(address(store.torex), outAmount, new bytes(0));
             // Note that `upgradeTo` expects Super Token decimals.
         } else if (outTokenType == SuperTokenType.NativeAsset) {
-            WETH.withdraw(outAmountForSwap);
-            ISETH(address(outToken)).upgradeByETHTo(address(torex));
+            WETH.withdraw(store.outAmountForSwap);
+            ISETH(address(outToken)).upgradeByETHTo(address(store.torex));
         } else {
             // Pure Super Token
-            // `outToken` is same as `outTokenForSwap` in this case
-            TransferHelper.safeTransfer(address(outToken), address(torex), outAmount);
+            TransferHelper.safeTransfer(address(outToken), address(store.torex), outAmount);
         }
         // ---
+
+        transientStorage = store;
 
         return true;
     }
