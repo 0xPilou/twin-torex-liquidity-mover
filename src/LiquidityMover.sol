@@ -36,7 +36,27 @@ interface ILiquidityMover {
         returns (bool);
 }
 
-// TorexCore.CoreConfig memory cc = torexArray[i].getCoreConfig();
+interface Torex {
+    function getBenchmarkQuote(uint256 inAmount) external view returns (uint256);
+    function moveLiquidity() external;
+    function proxiedObserver() external view returns (ITwapObserver);
+    function getCoreConfig() external view returns (CoreConfig memory);
+}
+
+interface ITwapObserver {
+    /**
+     * @dev Get the type id of the observer.
+     *
+     * Note:
+     *   - This is useful for safe down-casting to the actual implementation.
+     */
+    function getTypeId() external view returns (bytes32); // keccak
+        // 0xac2a7a01d08bec8d803b8d20516dcd7baca72524f2400f9e19acb905302f03e4 for UniswapV3PoolTwapObserver
+}
+
+interface IUniswapV3PoolTwapObserver is ITwapObserver {
+    function uniPool() external view returns (IUniswapV3Pool);
+}
 
 struct CoreConfig {
     address host;
@@ -55,12 +75,6 @@ struct CoreConfig {
     /// Scaler used for the quotes from the pool.
     // Scaler
     bool uniV3QuoteScaler;
-}
-
-interface Torex {
-    function getBenchmarkQuote(uint256 inAmount) external view returns (uint256);
-    function getCoreConfig() external view returns (CoreConfig memory);
-    function moveLiquidity() external;
 }
 
 interface IUniswapSwapRouter is ISwapRouter, IPeripheryImmutableState { }
@@ -176,6 +190,12 @@ contract UniswapLiquidityMover is ILiquidityMover {
         );
         require(address(store.torex) == msg.sender, "LiquidityMover: expecting caller to be TOREX");
 
+        IUniswapV3PoolTwapObserver observer = IUniswapV3PoolTwapObserver(address(store.torex.proxiedObserver()));
+        require(
+            observer.getTypeId() == keccak256("UniswapV3PoolTwapObserver"),
+            "LiquidityMover: unsupported observer type. This Liquidity mover only for for Uniswap-based TWAP observers."
+        );
+
         // # Normalize In and Out Tokens
         // It means unwrapping and converting them to an ERC-20 that the swap router understands.
         (SuperTokenType inTokenType, address inTokenUnderlyingToken) = getSuperTokenType(inToken);
@@ -219,7 +239,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
             tokenIn: address(store.inTokenForSwap),
             tokenOut: address(store.outTokenForSwap),
-            fee: store.torex.getCoreConfig().uniV3Pool.fee(),
+            fee: observer.uniPool().fee(),
             recipient: address(this),
             deadline: block.timestamp,
             amountOut: store.outAmountForSwap,
