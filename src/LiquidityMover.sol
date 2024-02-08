@@ -58,12 +58,8 @@ struct CoreConfig {
 }
 
 interface Torex {
-    // function inToken() external view returns (ISuperToken);
-    // function outToken() external view returns (ISuperToken);
-    // function uniV3Pool() external view returns (IUniswapV3Pool);
     function getBenchmarkQuote(uint256 inAmount) external view returns (uint256);
     function getCoreConfig() external view returns (CoreConfig memory);
-
     function moveLiquidity() external;
 }
 
@@ -88,6 +84,18 @@ contract UniswapLiquidityMover is ILiquidityMover {
         IERC20 outTokenForSwap;
         uint256 outAmountForSwap;
     }
+
+    event LiquidityMoved(
+        Torex torex,
+        address rewardAddress,
+        uint256 minRewardAmount,
+        uint256 rewardAmount,
+        IERC20 inTokenForSwap,
+        uint256 inAmountForSwap,
+        uint256 inAmountUsedForSwap,
+        IERC20 outTokenForSwap,
+        uint256 outAmountForSwap
+    );
 
     // Note that this storage should be emptied by the end of each transaction.
     // Named after: https://eips.ethereum.org/EIPS/eip-1153
@@ -115,10 +123,22 @@ contract UniswapLiquidityMover is ILiquidityMover {
 
         torex.moveLiquidity();
 
-        uint256 reward = transientStorage.inAmountForSwap - transientStorage.inAmountUsedForSwap;
-        require(reward >= minRewardAmount, "LiquidityMover: reward too low");
+        uint256 rewardAmount = transientStorage.inAmountForSwap - transientStorage.inAmountUsedForSwap;
+        require(rewardAmount >= minRewardAmount, "LiquidityMover: reward too low");
 
-        transientStorage.inTokenForSwap.transfer(rewardAddress, reward);
+        transientStorage.inTokenForSwap.transfer(rewardAddress, rewardAmount);
+
+        emit LiquidityMoved({
+            torex: torex,
+            rewardAddress: rewardAddress,
+            minRewardAmount: minRewardAmount,
+            rewardAmount: rewardAmount,
+            inTokenForSwap: transientStorage.inTokenForSwap,
+            inAmountForSwap: transientStorage.inAmountForSwap,
+            inAmountUsedForSwap: transientStorage.inAmountUsedForSwap,
+            outTokenForSwap: transientStorage.outTokenForSwap,
+            outAmountForSwap: transientStorage.outAmountForSwap
+        });
 
         delete transientStorage;
 
