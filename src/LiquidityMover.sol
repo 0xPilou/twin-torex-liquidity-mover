@@ -30,7 +30,8 @@ interface ILiquidityMover {
         ISuperToken inToken,
         ISuperToken outToken,
         uint256 inAmount,
-        uint256 minOutAmount
+        uint256 minOutAmount,
+        bytes calldata moverData
     )
         external
         returns (bool);
@@ -38,9 +39,8 @@ interface ILiquidityMover {
 
 interface Torex {
     function getBenchmarkQuote(uint256 inAmount) external view returns (uint256);
-    function moveLiquidity() external;
-    function proxiedObserver() external view returns (ITwapObserver);
-    function getCoreConfig() external view returns (CoreConfig memory);
+    function moveLiquidity(bytes calldata moverData) external;
+    function getConfig() external view returns (Config memory);
 }
 
 interface ITwapObserver {
@@ -58,23 +58,15 @@ interface IUniswapV3PoolTwapObserver is ITwapObserver {
     function uniPool() external view returns (IUniswapV3Pool);
 }
 
-struct CoreConfig {
-    address host;
+struct Config {
     ISuperToken inToken;
     ISuperToken outToken;
-    // Scaling factor between inToken flowrate and units assigned in the GDA pool for outToken distribution.
-    uint128 outTokenDistributionPoolScaler;
-    // Discount model factor, see getDiscountModelFactor function.
-    uint256 discountModelFactor;
-    // Uniswap V3 Pool TWAP Oracle Configurations
-    //
-    /// The Uniswap V3 pool to be used as price benchmark for liquidity moving.
-    IUniswapV3Pool uniV3Pool;
-    /// Uniswap pool is bi-direction but torex is not. If false, inToken maps to token0, and vice versa.
-    bool uniV3PoolInverseOrder;
-    /// Scaler used for the quotes from the pool.
-    // Scaler
-    bool uniV3QuoteScaler;
+    ITwapObserver observer;
+    uint256 discountFactor;
+    int256 twapScaler;
+    int256 outTokenDistributionPoolScaler;
+    address controller;
+    int256 maxAllowedFeePM;
 }
 
 interface IUniswapSwapRouter is ISwapRouter, IPeripheryImmutableState { }
@@ -135,7 +127,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
     function moveLiquidity(Torex torex, address rewardAddress, uint256 minRewardAmount) public returns (bool) {
         transientStorage.torex = torex;
 
-        torex.moveLiquidity();
+        torex.moveLiquidity(bytes(""));
 
         uint256 rewardAmount = transientStorage.inAmountForSwap - transientStorage.inAmountUsedForSwap;
         require(rewardAmount >= minRewardAmount, "LiquidityMover: reward too low");
@@ -173,7 +165,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
         ISuperToken outToken,
         // TODO: Rename or add comments? Alternative names could be `sentInAmount` and `minOutAmount`.
         uint256 inAmount,
-        uint256 outAmount
+        uint256 outAmount,
+        bytes calldata /* moverData */
     )
         // TODO: lock for re-entrancy
         external
@@ -190,7 +183,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         );
         require(address(store.torex) == msg.sender, "LiquidityMover: expecting caller to be TOREX");
 
-        IUniswapV3PoolTwapObserver observer = IUniswapV3PoolTwapObserver(address(store.torex.proxiedObserver()));
+        IUniswapV3PoolTwapObserver observer = IUniswapV3PoolTwapObserver(address(store.torex.getConfig().observer));
         require(
             observer.getTypeId() == keccak256("UniswapV3PoolTwapObserver"),
             "LiquidityMover: unsupported observer type. This Liquidity mover only for for Uniswap-based TWAP observers."

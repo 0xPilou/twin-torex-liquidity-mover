@@ -8,9 +8,7 @@ import { console2 } from "forge-std/console2.sol";
 import { StdCheats } from "forge-std/StdCheats.sol";
 import { ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 
-import {
-    ILiquidityMover, UniswapLiquidityMover, IUniswapSwapRouter, Torex, CoreConfig
-} from "../src/LiquidityMover.sol";
+import { ILiquidityMover, UniswapLiquidityMover, IUniswapSwapRouter, Torex, Config } from "../src/LiquidityMover.sol";
 
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 
@@ -33,10 +31,10 @@ contract FooTest is PRBTest {
         // Otherwise, run the test against the mainnet fork.
         vm.createSelectFork({
             urlOrAlias: "https://polygon-mumbai.g.alchemy.com/v2/Ra72TykU9ohKJ99Np3E7T-n-crUM1cuU",
-            blockNumber: 45_700_715
+            blockNumber: 46_136_516
         });
 
-        Torex torex = Torex(0xecaa3A23A61391B1A187c6c699325Ba6364C3A18);
+        Torex torex = Torex(0xABd20Dd4Ae471E6BA24c9744FD8F56eDDA6BFcdf);
 
         sut = new UniswapLiquidityMover(
             IUniswapSwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564),
