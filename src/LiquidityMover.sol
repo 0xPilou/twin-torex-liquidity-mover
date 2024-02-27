@@ -124,6 +124,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
         SETH = _nativeAssetSuperToken; // TODO: Get this from the protocol?
     }
 
+    receive() external payable { }
+
     // TODO: Pass in profit margin?
     // TODO: Pass in Uniswap v3 pool with fee?
     // TODO: lock for re-entrancy
@@ -168,8 +170,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
         ISuperToken inToken,
         ISuperToken outToken,
         // TODO: Rename or add comments? Alternative names could be `sentInAmount` and `minOutAmount`.
-        uint256 inAmount,
-        uint256 outAmount_,
+        uint256 originalInAmount,
+        uint256 unadjustedOutAmount,
         bytes calldata /* moverData */
     )
         // TODO: lock for re-entrancy
@@ -193,8 +195,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
             "LiquidityMover: unsupported observer type. This Liquidity mover only for for Uniswap-based TWAP observers."
         );
 
-        // uint256 inAmount = inToken.balanceOf(address(this));
-        // assert(inAmount <= inAmount_); // We expect the inAmount to be transferred to this contract.
+        uint256 inAmount = inToken.balanceOf(address(this));
+        assert(inAmount >= originalInAmount); // We always expect the inAmount to be transferred to this contract.
 
         // # Normalize In and Out Tokens
         // It means unwrapping and converting them to an ERC-20 that the swap router understands.
@@ -219,16 +221,18 @@ contract UniswapLiquidityMover is ILiquidityMover {
         (SuperTokenType outTokenType, address outTokenUnderlyingToken) = getSuperTokenType(outToken);
         if (outTokenType == SuperTokenType.Wrapper) {
             store.outTokenForSwap = IERC20(outTokenUnderlyingToken);
-            (store.adjustedOutAmount) = adjustOutAmount(outToken.getUnderlyingDecimals(), outAmount_);
+            (store.adjustedOutAmount) = adjustOutAmount(outToken.getUnderlyingDecimals(), unadjustedOutAmount);
             (store.outAmountForSwap,) = outToken.toUnderlyingAmount(store.adjustedOutAmount);
         } else if (outTokenType == SuperTokenType.NativeAsset) {
             store.outTokenForSwap = WETH;
-            store.outAmountForSwap = outAmount_;
+            store.outAmountForSwap = unadjustedOutAmount;
+            store.adjustedOutAmount = unadjustedOutAmount;
             // Assuming 18 decimals for the native asset.
         } else {
             // Pure Super Token
             store.outTokenForSwap = IERC20(outToken);
-            store.outAmountForSwap = outAmount_;
+            store.outAmountForSwap = unadjustedOutAmount;
+            store.adjustedOutAmount = unadjustedOutAmount;
         }
         // ---
 
@@ -264,8 +268,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
             outToken.upgradeTo(address(store.torex), store.adjustedOutAmount, new bytes(0));
             // Note that `upgradeTo` expects Super Token decimals.
         } else if (outTokenType == SuperTokenType.NativeAsset) {
-            WETH.withdraw(store.outAmountForSwap);
-            ISETH(address(outToken)).upgradeByETHTo(address(store.torex));
+            WETH.withdraw(store.adjustedOutAmount);
+            ISETH(address(outToken)).upgradeByETHTo{ value: store.adjustedOutAmount }(address(store.torex));
         } else {
             // Pure Super Token
             TransferHelper.safeTransfer(address(outToken), address(store.torex), store.adjustedOutAmount);
@@ -300,7 +304,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         }
     }
 
-    uint8 private constant SUPERTOKEN_DECIMALS = 18;
+    uint8 private constant SUPERTOKEN_DECIMALS = 18; // TODO: move up in the contract for better formatting?
 
     function adjustOutAmount(
         uint8 inTokenDecimals,
@@ -312,9 +316,9 @@ contract UniswapLiquidityMover is ILiquidityMover {
     {
         if (inTokenDecimals < SUPERTOKEN_DECIMALS) {
             uint256 factor = 10 ** (SUPERTOKEN_DECIMALS - inTokenDecimals);
-            adjustedOutAmount = ((outAmount / factor) + 1) * factor; // Effectively rounding up
+            adjustedOutAmount = ((outAmount / factor) + 1) * factor; // Effectively rounding up.
         }
-        // No need for adjustment when the underlying token has greater or equal decimals
+        // No need for adjustment when the underlying token has greater or equal decimals.
         else {
             adjustedOutAmount = outAmount;
         }
