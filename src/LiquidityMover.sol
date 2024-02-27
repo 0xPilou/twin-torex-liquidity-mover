@@ -89,6 +89,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
         uint256 inAmountUsedForSwap;
         IERC20 outTokenForSwap;
         uint256 outAmountForSwap;
+        uint256 adjustedOutAmount;
+        uint256 outAmountAdjusted;
     }
 
     event LiquidityMoved(
@@ -100,7 +102,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
         uint256 inAmountForSwap,
         uint256 inAmountUsedForSwap,
         IERC20 outTokenForSwap,
-        uint256 outAmountForSwap
+        uint256 outAmountForSwap,
+        uint256 outAmountAdjusted
     );
 
     // Note that this storage should be emptied by the end of each transaction.
@@ -143,7 +146,8 @@ contract UniswapLiquidityMover is ILiquidityMover {
             inAmountForSwap: transientStorage.inAmountForSwap,
             inAmountUsedForSwap: transientStorage.inAmountUsedForSwap,
             outTokenForSwap: transientStorage.outTokenForSwap,
-            outAmountForSwap: transientStorage.outAmountForSwap
+            outAmountForSwap: transientStorage.outAmountForSwap,
+            outAmountAdjusted: transientStorage.outAmountAdjusted
         });
 
         delete transientStorage;
@@ -165,7 +169,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
         ISuperToken outToken,
         // TODO: Rename or add comments? Alternative names could be `sentInAmount` and `minOutAmount`.
         uint256 inAmount,
-        uint256 outAmount,
+        uint256 outAmount_,
         bytes calldata /* moverData */
     )
         // TODO: lock for re-entrancy
@@ -189,11 +193,14 @@ contract UniswapLiquidityMover is ILiquidityMover {
             "LiquidityMover: unsupported observer type. This Liquidity mover only for for Uniswap-based TWAP observers."
         );
 
+        // uint256 inAmount = inToken.balanceOf(address(this));
+        // assert(inAmount <= inAmount_); // We expect the inAmount to be transferred to this contract.
+
         // # Normalize In and Out Tokens
         // It means unwrapping and converting them to an ERC-20 that the swap router understands.
         (SuperTokenType inTokenType, address inTokenUnderlyingToken) = getSuperTokenType(inToken);
         if (inTokenType == SuperTokenType.Wrapper) {
-            inToken.downgrade(inAmount);
+            inToken.downgrade(inAmount); // use balanceOf
             store.inTokenForSwap = IERC20(inTokenUnderlyingToken);
         } else if (inTokenType == SuperTokenType.NativeAsset) {
             ISETH(address(inToken)).downgradeToETH(inAmount);
@@ -212,15 +219,16 @@ contract UniswapLiquidityMover is ILiquidityMover {
         (SuperTokenType outTokenType, address outTokenUnderlyingToken) = getSuperTokenType(outToken);
         if (outTokenType == SuperTokenType.Wrapper) {
             store.outTokenForSwap = IERC20(outTokenUnderlyingToken);
-            (store.outAmountForSwap,) = outToken.toUnderlyingAmount(outAmount);
+            (store.adjustedOutAmount) = adjustOutAmount(outToken.getUnderlyingDecimals(), outAmount_);
+            (store.outAmountForSwap,) = outToken.toUnderlyingAmount(store.adjustedOutAmount);
         } else if (outTokenType == SuperTokenType.NativeAsset) {
             store.outTokenForSwap = WETH;
-            store.outAmountForSwap = outAmount;
+            store.outAmountForSwap = outAmount_;
             // Assuming 18 decimals for the native asset.
         } else {
             // Pure Super Token
             store.outTokenForSwap = IERC20(outToken);
-            store.outAmountForSwap = outAmount;
+            store.outAmountForSwap = outAmount_;
         }
         // ---
 
@@ -253,14 +261,14 @@ contract UniswapLiquidityMover is ILiquidityMover {
         if (outTokenType == SuperTokenType.Wrapper) {
             // TODO: Is it possible that there could be some remnant allowance here that breaks USDT?
             TransferHelper.safeApprove(address(store.outTokenForSwap), address(outToken), store.outAmountForSwap);
-            outToken.upgradeTo(address(store.torex), outAmount, new bytes(0));
+            outToken.upgradeTo(address(store.torex), store.adjustedOutAmount, new bytes(0));
             // Note that `upgradeTo` expects Super Token decimals.
         } else if (outTokenType == SuperTokenType.NativeAsset) {
             WETH.withdraw(store.outAmountForSwap);
             ISETH(address(outToken)).upgradeByETHTo(address(store.torex));
         } else {
             // Pure Super Token
-            TransferHelper.safeTransfer(address(outToken), address(store.torex), outAmount);
+            TransferHelper.safeTransfer(address(outToken), address(store.torex), store.adjustedOutAmount);
         }
         // ---
 
@@ -289,6 +297,26 @@ contract UniswapLiquidityMover is ILiquidityMover {
             } else {
                 return (SuperTokenType.Pure, address(0));
             }
+        }
+    }
+
+    uint8 private constant SUPERTOKEN_DECIMALS = 18;
+
+    function adjustOutAmount(
+        uint8 inTokenDecimals,
+        uint256 outAmount
+    )
+        private
+        pure
+        returns (uint256 adjustedOutAmount)
+    {
+        if (inTokenDecimals < SUPERTOKEN_DECIMALS) {
+            uint256 factor = 10 ** (SUPERTOKEN_DECIMALS - inTokenDecimals);
+            adjustedOutAmount = ((outAmount / factor) + 1) * factor; // Effectively rounding up
+        }
+        // No need for adjustment when the underlying token has greater or equal decimals
+        else {
+            adjustedOutAmount = outAmount;
         }
     }
 }
