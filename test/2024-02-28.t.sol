@@ -16,20 +16,16 @@ contract LiquidityMoverTests is PRBTest {
     UniswapLiquidityMover internal sut;
 
     function setUp() public {
-        string memory alchemyApiKey = vm.envOr("API_KEY_POLYGONSCAN", string(""));
-        if (bytes(alchemyApiKey).length == 0) {
-            return;
-        }
-
         // Otherwise, run the test against the mainnet fork.
+        // todo: env variable
         vm.createSelectFork({
             urlOrAlias: "https://opt-mainnet.g.alchemy.com/v2/9fhll0R2q_65eilDZmD4AiUULqr6Ae2a",
-            blockNumber: 116_724_051
+            blockNumber: 116_756_644
         });
 
         sut = new UniswapLiquidityMover(
             IUniswapSwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564),
-            ISETH(0x4ac8bD1bDaE47beeF2D1c6Aa62229509b962Aa0d) // The n
+            ISETH(0x4ac8bD1bDaE47beeF2D1c6Aa62229509b962Aa0d) // The Super Token on for Native Asset on Optimism
         );
     }
 
@@ -51,7 +47,7 @@ contract LiquidityMoverTests is PRBTest {
 
     function _testTorex(Torex torex) internal {
         address randomRewardAddress = address(0xa5F402E7B32aBf648C9B0638bb0FAb275AA445b7);
-        bool isSuccess = sut.moveLiquidity(torex, randomRewardAddress, 0);
+        bool isSuccess = sut.moveLiquidity(torex, randomRewardAddress, 1000);
 
         assertTrue(isSuccess);
     }
