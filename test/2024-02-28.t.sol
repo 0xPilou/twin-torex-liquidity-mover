@@ -29,19 +29,19 @@ contract LiquidityMoverTests is PRBTest {
         );
     }
 
-    function test_ETHx_OPx() external {
+    function test_ETHx_to_OPx() external {
         _testTorex(Torex(0x605a2903C819CFA41ea6dD38AE2D1aAF6d01Ec33)); // (ETHx -> OPx)
     }
 
-    function test_OPx_ETHx() external {
+    function test_OPx_to_ETHx() external {
         _testTorex(Torex(0x4eA8d965e3337AFd4614d2D42ED3310AD7d0B550)); // (OPx -> ETHx)
     }
 
-    function test_OPx_USDCx() external {
+    function test_OPx_to_USDCx() external {
         _testTorex(Torex(0x2a90d7fdCb5e0506e1799B3ED852A91aC067D36e)); // (OPx -> USDCx)
     }
 
-    function test_USDCx_OPx() external {
+    function test_USDCx_to_OPx() external {
         _testTorex(Torex(0x82D28B941dB301Ea7F32d4389BBB98b1A3eA3235)); // (USDCx -> OPx)
     }
 
