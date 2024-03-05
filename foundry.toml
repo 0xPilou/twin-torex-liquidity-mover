@@ -39,7 +39,7 @@ verbosity = 4
 # gnosis_chain = { key = "${API_KEY_GNOSISSCAN}" }
 # goerli = { key = "${API_KEY_ETHERSCAN}" }
 # mainnet = { key = "${API_KEY_ETHERSCAN}" }
-# optimism = { key = "${API_KEY_OPTIMISTIC_ETHERSCAN}" }
+optimism = { key = "${API_KEY_OPTIMISTIC_ETHERSCAN}", chain = 10 }
 polygon = { key = "${API_KEY_POLYGONSCAN}" }
 polygon_mumbai = { key = "${API_KEY_POLYGONSCAN}", chain = 80001 }
 # sepolia = { key = "${API_KEY_ETHERSCAN}" }

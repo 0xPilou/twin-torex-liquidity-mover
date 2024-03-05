@@ -54,14 +54,31 @@ contract LiquidityMoverTests is PRBTest {
     }
 
     function _testTorex(Torex torex, address rewardToken) internal {
-        address rewardAddress = address(0xa5F402E7B32aBf648C9B0638bb0FAb275AA445b7);
+        assertTrue(sut.moveLiquidity(torex));
 
-        uint256 rewardAmount = 10;
-        assertTrue(sut.moveLiquidity(torex, rewardAddress, rewardAmount));
+        ISuperToken outToken = torex.getConfig().outToken;
+        assertEq(outToken.balanceOf(address(sut)), 0);
+        address outTokenUnderlying = outToken.getUnderlyingToken();
+        if (outTokenUnderlying != address(0)) {
+            assertLte(IERC20(outTokenUnderlying).balanceOf(address(sut)), 0);
+        }
 
-        assertEq(torex.getConfig().outToken.balanceOf(address(sut)), 0);
         assertEq(IERC20(rewardToken).balanceOf(address(sut)), 0);
+        assertEq(IERC20(rewardToken).balanceOf(address(torex)), 0);
+
+        ISuperToken inToken = torex.getConfig().inToken;
+
+        address inTokenUnderlying = inToken.getUnderlyingToken();
+        uint8 inTokenDecimals = inToken.getUnderlyingDecimals();
+        if (inTokenDecimals < 18) {
+            assertLte(inToken.balanceOf(address(sut)), 1_000_000_000_000);
+        } else {
+            assertLte(inToken.balanceOf(address(sut)), 0);
+        }
+
+        if (inTokenUnderlying != address(0)) {
+            assertEq(IERC20(inTokenUnderlying).balanceOf(address(sut)), 0);
+        }
         assertEq(address(sut).balance, 0);
-        assertGte(IERC20(rewardToken).balanceOf(address(rewardAddress)), rewardAmount);
     }
 }
