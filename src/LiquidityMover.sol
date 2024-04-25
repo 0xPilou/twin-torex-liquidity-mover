@@ -5,11 +5,9 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import { TransferHelper } from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
-import { ISwapRouter } from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import { IV3SwapRouter } from "@uniswap/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
 import { IPeripheryImmutableState } from "@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol";
 import { IWETH9 } from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
-
-import { AutomateReady } from "automate/integrations/AutomateReady.sol";
 
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 import { ISETHCustom, ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
@@ -69,12 +67,12 @@ struct Config {
     int256 maxAllowedFeePM;
 }
 
-interface IUniswapSwapRouter is ISwapRouter, IPeripheryImmutableState { }
+interface IUniswapSwapRouter is IV3SwapRouter, IPeripheryImmutableState { }
 
 contract UniswapLiquidityMover is ILiquidityMover {
     uint8 private constant SUPERTOKEN_DECIMALS = 18;
 
-    ISwapRouter public immutable swapRouter;
+    IUniswapSwapRouter public immutable swapRouter;
     IWETH9 public immutable WETH;
     ISETH public immutable SETH;
 
@@ -107,14 +105,18 @@ contract UniswapLiquidityMover is ILiquidityMover {
     // Named after: https://eips.ethereum.org/EIPS/eip-1153
     TransientStorage private transientStorage;
 
+    /**
+     * @param _swapRouter02 Make sure it's "SwapRouter02"!!! Not just "SwapRouter".
+     * @param _nativeAssetSuperToken The chain's Native Asset Super Token (aka ETHx or SETH).
+     */
     constructor(
-        IUniswapSwapRouter _swapRouter,
+        IUniswapSwapRouter _swapRouter02,
         // Uniswap addresses available here: https://docs.uniswap.org/contracts/v3/reference/deployments (e.g.
         // 0xE592427A0AEce92De3Edee1F18E0157C05861564 for swap router)
         ISETH _nativeAssetSuperToken
     ) {
-        swapRouter = _swapRouter;
-        WETH = IWETH9(_swapRouter.WETH9());
+        swapRouter = _swapRouter02;
+        WETH = IWETH9(_swapRouter02.WETH9());
         SETH = _nativeAssetSuperToken; // TODO: Get this from the protocol?
     }
 
@@ -198,12 +200,11 @@ contract UniswapLiquidityMover is ILiquidityMover {
         }
 
         // Single swap guide about Swap Router: https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps
-        ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
+        IV3SwapRouter.ExactOutputSingleParams memory params = IV3SwapRouter.ExactOutputSingleParams({
             tokenIn: address(store.inTokenForSwap),
             tokenOut: address(store.outTokenForSwap),
             fee: store.observer.uniPool().fee(),
             recipient: address(this),
-            deadline: block.timestamp,
             amountOut: store.outAmountForSwap,
             amountInMaximum: store.inAmountForSwap,
             sqrtPriceLimitX96: 0
