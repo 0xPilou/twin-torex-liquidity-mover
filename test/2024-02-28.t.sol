@@ -31,7 +31,7 @@ contract LiquidityMoverTests is PRBTest {
         });
 
         sut = new UniswapLiquidityMover(
-            IUniswapSwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564),
+            IUniswapSwapRouter(0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45), // "SwapRouter02"! (not just "SwapRouter")
             ISETH(0x4ac8bD1bDaE47beeF2D1c6Aa62229509b962Aa0d) // The Super Token on for Native Asset on Optimism
         );
     }
