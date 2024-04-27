@@ -44,6 +44,7 @@ optimism = { key = "${API_KEY_OPTIMISTIC_ETHERSCAN}", chain = 10 }
 polygon = { key = "${API_KEY_POLYGONSCAN}" }
 polygon_mumbai = { key = "${API_KEY_POLYGONSCAN}", chain = 80001 }
 # sepolia = { key = "${API_KEY_ETHERSCAN}" }
+# celo = { key = "${API_KEY_CELOSCAN}", chain = 42220 }
 
 [fmt]
 bracket_spacing = true
@@ -56,6 +57,8 @@ tab_width = 4
 wrap_comments = true
 
 [rpc_endpoints]
+# celo-alfajores = "https://alfajores-forno.celo-testnet.org"
+# celo = "https://forno.celo.org"
 # arbitrum_one = "https://arbitrum-mainnet.infura.io/v3/${API_KEY_INFURA}"
 # avalanche = "https://avalanche-mainnet.infura.io/v3/${API_KEY_INFURA}"
 # bnb_smart_chain = "https://bsc-dataseed.binance.org"

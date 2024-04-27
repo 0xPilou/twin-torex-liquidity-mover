@@ -75,6 +75,7 @@ contract UniswapLiquidityMover is ILiquidityMover {
     IUniswapSwapRouter public immutable swapRouter;
     IWETH9 public immutable WETH;
     ISETH public immutable SETH;
+    IERC20 public immutable ERC20ETH;
 
     struct TransientStorage {
         Torex torex;
@@ -94,16 +95,25 @@ contract UniswapLiquidityMover is ILiquidityMover {
     /**
      * @param _swapRouter02 Make sure it's "SwapRouter02"!!! Not just "SwapRouter".
      * @param _nativeAssetSuperToken The chain's Native Asset Super Token (aka ETHx or SETH).
+     * @param _nativeAssetERC20 The chain's ERC20 for Native Asset (not necessarily WETH).
      */
     constructor(
         IUniswapSwapRouter _swapRouter02,
         // Uniswap addresses available here: https://docs.uniswap.org/contracts/v3/reference/deployments (e.g.
         // 0xE592427A0AEce92De3Edee1F18E0157C05861564 for swap router)
-        ISETH _nativeAssetSuperToken
+        ISETH _nativeAssetSuperToken,
+        IERC20 _nativeAssetERC20
     ) {
         swapRouter = _swapRouter02;
+        SETH = _nativeAssetSuperToken;
+
+        ERC20ETH = _nativeAssetERC20;
         WETH = IWETH9(_swapRouter02.WETH9());
-        SETH = _nativeAssetSuperToken; // TODO: Get this from the protocol?
+        // Note that native asset ERC20 usage will take priority over WETH when handling Native Asset Super Tokens.
+
+        if (address(ERC20ETH) == address(0) && address(WETH) == address(0)) {
+            revert("LiquidityMover: Don't know how to handle native asset ERC20.");
+        }
     }
 
     receive() external payable { }
@@ -173,7 +183,6 @@ contract UniswapLiquidityMover is ILiquidityMover {
             if (store.swapOutToken.allowance(address(this), address(outToken)) < swapOutTokenBalance) {
                 TransferHelper.safeApprove(address(store.swapOutToken), address(outToken), type(uint256).max);
             }
-            // TODO:
             outToken.upgradeTo(
                 address(store.torex),
                 _toSuperTokenAmount(swapOutTokenBalance, outToken.getUnderlyingDecimals()),
@@ -181,7 +190,9 @@ contract UniswapLiquidityMover is ILiquidityMover {
             );
             // Reminder that `upgradeTo` expects Super Token decimals.
         } else if (store.outTokenType == SuperTokenType.NativeAsset) {
-            WETH.withdraw(WETH.balanceOf(address(this)));
+            if (address(WETH) != address(0)) {
+                WETH.withdraw(WETH.balanceOf(address(this)));
+            }
             ISETH(address(outToken)).upgradeByETHTo{ value: address(this).balance }(address(store.torex));
         } else {
             // Pure Super Token
@@ -209,8 +220,12 @@ contract UniswapLiquidityMover is ILiquidityMover {
             swapInToken = IERC20(inTokenUnderlyingToken);
         } else if (inTokenType == SuperTokenType.NativeAsset) {
             ISETH(address(inToken)).downgradeToETH(inTokenBalance);
-            WETH.deposit{ value: address(this).balance }();
-            swapInToken = WETH;
+            if (address(WETH) != address(0)) {
+                WETH.deposit{ value: address(this).balance }();
+                swapInToken = WETH;
+            } else {
+                swapInToken = ERC20ETH;
+            }
         } else {
             // Pure Super Token
             swapInToken = inToken;
@@ -239,7 +254,11 @@ contract UniswapLiquidityMover is ILiquidityMover {
             outAmountAdjusted = _adjustOutAmount(outAmount, outToken.getUnderlyingDecimals());
             (swapOutAmountMinimum,) = outToken.toUnderlyingAmount(outAmountAdjusted);
         } else if (outTokenType == SuperTokenType.NativeAsset) {
-            swapOutToken = WETH;
+            if (address(WETH) != address(0)) {
+                swapOutToken = WETH;
+            } else {
+                swapOutToken = ERC20ETH;
+            }
             outAmountAdjusted = outAmount;
             swapOutAmountMinimum = outAmount;
         } else {
