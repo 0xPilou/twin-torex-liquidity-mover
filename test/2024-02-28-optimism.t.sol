@@ -9,13 +9,9 @@ import { StdCheats } from "forge-std/StdCheats.sol";
 import { ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 import { IWETH9 } from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
 
-import {
-    ILiquidityMover,
-    NonprofitUniswapLiquidityMover as UniswapLiquidityMover,
-    IUniswapSwapRouter,
-    Torex,
-    Config
-} from "../src/LiquidityMover.sol";
+import { ILiquidityMover, IUniswapSwapRouter, Torex, Config } from "../src/LiquidityMover.sol";
+
+import { NonprofitUniswapLiquidityMover as UniswapLiquidityMover } from "../src/NonprofitUniswapLiquidityMover.sol";
 
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 

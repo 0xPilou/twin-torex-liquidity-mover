@@ -12,6 +12,7 @@ import { IWETH9 } from "@uniswap/v3-periphery/contracts/interfaces/external/IWET
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 import { ISETHCustom, ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 
+// TODO: get from SuperBoring repo
 /**
  * @dev Interface for the Liquidity Mover contracts.
  */
@@ -35,12 +36,14 @@ interface ILiquidityMover {
         returns (bool);
 }
 
+// TODO: get from SuperBoring repo
 interface Torex {
     function getBenchmarkQuote(uint256 inAmount) external view returns (uint256);
     function moveLiquidity(bytes calldata moverData) external;
     function getConfig() external view returns (Config memory);
 }
 
+// TODO: get from SuperBoring repo
 interface ITwapObserver {
     /**
      * @dev Get the type id of the observer.
@@ -52,10 +55,12 @@ interface ITwapObserver {
         // 0xac2a7a01d08bec8d803b8d20516dcd7baca72524f2400f9e19acb905302f03e4 for UniswapV3PoolTwapObserver
 }
 
+// TODO: get from SuperBoring repo
 interface IUniswapV3PoolTwapObserver is ITwapObserver {
     function uniPool() external view returns (IUniswapV3Pool);
 }
 
+// TODO: get from SuperBoring repo
 struct Config {
     ISuperToken inToken;
     ISuperToken outToken;
@@ -77,9 +82,17 @@ abstract contract UniswapLiquidityMover is ILiquidityMover {
     ISETH public immutable SETH;
     IERC20 public immutable ERC20ETH;
 
+    enum SuperTokenType {
+        Pure,
+        Wrapper,
+        NativeAsset
+    }
+
     struct TransientStorage {
         Torex torex;
         IUniswapV3PoolTwapObserver observer;
+        ISuperToken inToken;
+        ISuperToken outToken;
         IERC20 swapInToken;
         uint256 swapInAmount;
         SuperTokenType outTokenType;
@@ -87,10 +100,6 @@ abstract contract UniswapLiquidityMover is ILiquidityMover {
         uint256 swapOutAmountMinimum;
         uint256 swapOutAmountReceived;
     }
-
-    // Note that this storage should be emptied by the end of each transaction.
-    // Named after: https://eips.ethereum.org/EIPS/eip-1153
-    TransientStorage internal transientStorage;
 
     /**
      * @param _swapRouter02 Make sure it's "SwapRouter02"!!! Not just "SwapRouter".
@@ -117,6 +126,51 @@ abstract contract UniswapLiquidityMover is ILiquidityMover {
     }
 
     receive() external payable { }
+
+    function _initializeTransientStorage(Torex torex) internal view returns (TransientStorage memory store) {
+        store.torex = torex;
+
+        Config memory torexConfig = store.torex.getConfig();
+        store.observer = IUniswapV3PoolTwapObserver(address(torexConfig.observer));
+
+        store.inToken = torexConfig.inToken;
+        store.outToken = torexConfig.outToken;
+
+        require(
+            store.observer.getTypeId() == keccak256("UniswapV3PoolTwapObserver"),
+            "LiquidityMover: unsupported observer type. This liquidity mover only for for Uniswap-based TWAP observers."
+        );
+    }
+
+    function _swap(
+        IERC20 swapInToken,
+        uint256 swapInAmount,
+        IERC20 swapOutToken,
+        uint256 swapOutAmountMinimum,
+        uint24 uniswapPoolFee
+    )
+        internal
+        returns (uint256 swapOutAmountReceived)
+    {
+        // # Swap
+        // Give swap router maximum allowance if necessary.
+        if (swapInToken.allowance(address(this), address(swapRouter)) < swapInAmount) {
+            TransferHelper.safeApprove(address(swapInToken), address(swapRouter), type(uint256).max);
+        }
+
+        // Single swap guide about Swap Router: https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps
+        IV3SwapRouter.ExactInputSingleParams memory params = IV3SwapRouter.ExactInputSingleParams({
+            tokenIn: address(swapInToken),
+            tokenOut: address(swapOutToken),
+            recipient: address(this),
+            amountIn: swapInAmount,
+            amountOutMinimum: swapOutAmountMinimum,
+            fee: uniswapPoolFee,
+            sqrtPriceLimitX96: 0
+        });
+
+        return swapRouter.exactInputSingle(params);
+    }
 
     function _prepareInToken(
         ISuperToken inToken,
@@ -184,10 +238,26 @@ abstract contract UniswapLiquidityMover is ILiquidityMover {
         }
     }
 
-    enum SuperTokenType {
-        Pure,
-        Wrapper,
-        NativeAsset
+    function _payTorexOutTokens(TransientStorage memory store, uint256 paymentAmount) internal {
+        if (store.outTokenType == SuperTokenType.Wrapper) {
+            if (store.swapOutToken.allowance(address(this), address(store.outToken)) < paymentAmount) {
+                TransferHelper.safeApprove(address(store.swapOutToken), address(store.outToken), type(uint256).max);
+            }
+            store.outToken.upgradeTo(
+                address(store.torex),
+                _toSuperTokenAmount(paymentAmount, store.outToken.getUnderlyingDecimals()),
+                bytes("")
+            );
+            // Reminder that `upgradeTo` expects Super Token decimals.
+        } else if (store.outTokenType == SuperTokenType.NativeAsset) {
+            if (address(store.swapOutToken) == address(WETH)) {
+                WETH.withdraw(paymentAmount);
+            }
+            ISETH(address(store.outToken)).upgradeByETHTo{ value: paymentAmount }(address(store.torex));
+        } else {
+            // Pure Super Token
+            TransferHelper.safeTransfer(address(store.outToken), address(store.torex), paymentAmount);
+        }
     }
 
     function _getSuperTokenType(ISuperToken superToken)
@@ -200,7 +270,7 @@ abstract contract UniswapLiquidityMover is ILiquidityMover {
         if (isNativeAssetSuperToken) {
             return (SuperTokenType.NativeAsset, address(0));
             // Note that there are a few exceptions where Native Asset Super Tokens have an underlying token,
-            // but we don't want to use it, hence we don't return it.
+            // but we don't want to use it for simplification reasons, hence we don't return it.
         } else {
             address underlyingToken = superToken.getUnderlyingToken();
             if (underlyingToken != address(0)) {
@@ -247,101 +317,5 @@ abstract contract UniswapLiquidityMover is ILiquidityMover {
         } else {
             superTokenAmount = underlyingAmount;
         }
-    }
-}
-
-contract NonprofitUniswapLiquidityMover is UniswapLiquidityMover {
-    constructor(
-        IUniswapSwapRouter _swapRouter02,
-        ISETH _nativeAssetSuperToken,
-        IERC20 _nativeAssetERC20
-    )
-        UniswapLiquidityMover(_swapRouter02, _nativeAssetSuperToken, _nativeAssetERC20)
-    {
-        // Additional initialization for the derived contract can go here
-    }
-
-    function moveLiquidity(Torex torex) external returns (bool) {
-        transientStorage.torex = torex;
-
-        torex.moveLiquidity(bytes(""));
-
-        return true;
-    }
-
-    function moveLiquidityCallback(
-        ISuperToken inToken,
-        ISuperToken outToken,
-        uint256 inAmount,
-        uint256 minOutAmount,
-        bytes calldata /* moverData */
-    )
-        // TODO: lock for re-entrancy?
-        external
-        override
-        returns (bool)
-    {
-        TransientStorage memory store;
-
-        store.torex = Torex(address(msg.sender));
-
-        store.observer = IUniswapV3PoolTwapObserver(address(store.torex.getConfig().observer));
-        require(
-            store.observer.getTypeId() == keccak256("UniswapV3PoolTwapObserver"),
-            "LiquidityMover: unsupported observer type. This Liquidity mover only for for Uniswap-based TWAP observers."
-        );
-
-        // # Prepare In and Out Tokens
-        // It means unwrapping and converting them to ERC-20s that the swap router understands.
-        (store.swapInToken, store.swapInAmount) = _prepareInToken(inToken, inAmount);
-        (store.outTokenType, store.swapOutToken, store.swapOutAmountMinimum,) = _prepareOutToken(outToken, minOutAmount);
-
-        // ---
-
-        // # Swap
-        // Give swap router maximum allowance if necessary.
-        if (store.swapInToken.allowance(address(this), address(swapRouter)) < store.swapInAmount) {
-            TransferHelper.safeApprove(address(store.swapInToken), address(swapRouter), type(uint256).max);
-        }
-
-        // Single swap guide about Swap Router: https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps
-        IV3SwapRouter.ExactInputSingleParams memory params = IV3SwapRouter.ExactInputSingleParams({
-            tokenIn: address(store.swapInToken),
-            tokenOut: address(store.swapOutToken),
-            fee: store.observer.uniPool().fee(),
-            recipient: address(this),
-            amountIn: store.swapInAmount,
-            amountOutMinimum: store.swapOutAmountMinimum,
-            sqrtPriceLimitX96: 0
-        });
-
-        store.swapOutAmountReceived = swapRouter.exactInputSingle(params);
-        // ---
-
-        // # Pay TOREX the out tokens
-        if (store.outTokenType == SuperTokenType.Wrapper) {
-            // Give Super Token maximum allowance if necessary.
-            uint256 swapOutTokenBalance = store.swapOutToken.balanceOf(address(this));
-            if (store.swapOutToken.allowance(address(this), address(outToken)) < swapOutTokenBalance) {
-                TransferHelper.safeApprove(address(store.swapOutToken), address(outToken), type(uint256).max);
-            }
-            outToken.upgradeTo(
-                address(store.torex),
-                _toSuperTokenAmount(swapOutTokenBalance, outToken.getUnderlyingDecimals()),
-                bytes("")
-            );
-            // Reminder that `upgradeTo` expects Super Token decimals.
-        } else if (store.outTokenType == SuperTokenType.NativeAsset) {
-            if (address(WETH) != address(0)) {
-                WETH.withdraw(WETH.balanceOf(address(this)));
-            }
-            ISETH(address(outToken)).upgradeByETHTo{ value: address(this).balance }(address(store.torex));
-        } else {
-            // Pure Super Token
-            TransferHelper.safeTransfer(address(outToken), address(store.torex), outToken.balanceOf(address(this)));
-        }
-        // ---
-
-        return true;
     }
 }
