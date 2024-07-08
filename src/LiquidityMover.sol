@@ -69,7 +69,7 @@ struct Config {
 
 interface IUniswapSwapRouter is IV3SwapRouter, IPeripheryImmutableState { }
 
-contract NonprofitUniswapLiquidityMover is ILiquidityMover {
+abstract contract UniswapLiquidityMover is ILiquidityMover {
     uint8 private constant SUPERTOKEN_DECIMALS = 18;
 
     IUniswapSwapRouter public immutable swapRouter;
@@ -90,7 +90,7 @@ contract NonprofitUniswapLiquidityMover is ILiquidityMover {
 
     // Note that this storage should be emptied by the end of each transaction.
     // Named after: https://eips.ethereum.org/EIPS/eip-1153
-    TransientStorage private transientStorage;
+    TransientStorage internal transientStorage;
 
     /**
      * @param _swapRouter02 Make sure it's "SwapRouter02"!!! Not just "SwapRouter".
@@ -118,7 +118,150 @@ contract NonprofitUniswapLiquidityMover is ILiquidityMover {
 
     receive() external payable { }
 
-    function moveLiquidity(Torex torex) public returns (bool) {
+    function _prepareInToken(
+        ISuperToken inToken,
+        uint256 inAmount
+    )
+        internal
+        returns (IERC20 swapInToken, uint256 swapInAmount)
+    {
+        uint256 inTokenBalance = inToken.balanceOf(address(this));
+        assert(inTokenBalance >= inAmount); // We always expect the inAmount to be transferred to this contract.
+
+        (SuperTokenType inTokenType, address inTokenUnderlyingToken) = _getSuperTokenType(inToken);
+        if (inTokenType == SuperTokenType.Wrapper) {
+            inToken.downgrade(inTokenBalance);
+            // Note that this can leave some dust behind when underlying token decimals differ.
+            swapInToken = IERC20(inTokenUnderlyingToken);
+        } else if (inTokenType == SuperTokenType.NativeAsset) {
+            ISETH(address(inToken)).downgradeToETH(inTokenBalance);
+            if (address(WETH) != address(0)) {
+                WETH.deposit{ value: address(this).balance }();
+                swapInToken = WETH;
+            } else {
+                swapInToken = ERC20ETH;
+            }
+        } else {
+            // Pure Super Token
+            swapInToken = inToken;
+        }
+        swapInAmount = swapInToken.balanceOf(address(this));
+    }
+
+    function _prepareOutToken(
+        ISuperToken outToken,
+        uint256 outAmount
+    )
+        internal
+        view
+        returns (
+            SuperTokenType outTokenType,
+            IERC20 swapOutToken,
+            uint256 swapOutAmountMinimum,
+            uint256 outAmountAdjusted
+        )
+    {
+        address outTokenUnderlyingToken;
+        (outTokenType, outTokenUnderlyingToken) = _getSuperTokenType(outToken);
+
+        if (outTokenType == SuperTokenType.Wrapper) {
+            swapOutToken = IERC20(outTokenUnderlyingToken);
+            outAmountAdjusted = _adjustOutAmount(outAmount, outToken.getUnderlyingDecimals());
+            (swapOutAmountMinimum,) = outToken.toUnderlyingAmount(outAmountAdjusted);
+        } else if (outTokenType == SuperTokenType.NativeAsset) {
+            if (address(WETH) != address(0)) {
+                swapOutToken = WETH;
+            } else {
+                swapOutToken = ERC20ETH;
+            }
+            outAmountAdjusted = outAmount;
+            swapOutAmountMinimum = outAmount;
+        } else {
+            // Pure Super Token
+            swapOutToken = outToken;
+            outAmountAdjusted = outAmount;
+            swapOutAmountMinimum = outAmount;
+        }
+    }
+
+    enum SuperTokenType {
+        Pure,
+        Wrapper,
+        NativeAsset
+    }
+
+    function _getSuperTokenType(ISuperToken superToken)
+        internal
+        view
+        returns (SuperTokenType, address underlyingTokenAddress)
+    {
+        // TODO: Allow for optimization from off-chain set-up?
+        bool isNativeAssetSuperToken = address(superToken) == address(SETH);
+        if (isNativeAssetSuperToken) {
+            return (SuperTokenType.NativeAsset, address(0));
+            // Note that there are a few exceptions where Native Asset Super Tokens have an underlying token,
+            // but we don't want to use it, hence we don't return it.
+        } else {
+            address underlyingToken = superToken.getUnderlyingToken();
+            if (underlyingToken != address(0)) {
+                return (SuperTokenType.Wrapper, underlyingToken);
+            } else {
+                return (SuperTokenType.Pure, address(0));
+            }
+        }
+    }
+
+    function _adjustOutAmount(
+        uint256 outAmount, // 18 decimals
+        uint8 underlyingTokenDecimals
+    )
+        internal
+        pure
+        returns (uint256 outAmountAdjusted)
+    {
+        if (underlyingTokenDecimals < SUPERTOKEN_DECIMALS) {
+            uint256 factor = 10 ** (SUPERTOKEN_DECIMALS - underlyingTokenDecimals);
+            outAmountAdjusted = ((outAmount / factor) + 1) * factor; // Effectively rounding up.
+        }
+        // No need for adjustment when the underlying token has greater or equal decimals.
+        else {
+            outAmountAdjusted = outAmount;
+        }
+    }
+
+    function _toSuperTokenAmount(
+        uint256 underlyingAmount,
+        uint8 underlyingDecimals
+    )
+        internal
+        pure
+        returns (uint256 superTokenAmount)
+    {
+        uint256 factor;
+        if (underlyingDecimals < SUPERTOKEN_DECIMALS) {
+            factor = 10 ** (SUPERTOKEN_DECIMALS - underlyingDecimals);
+            superTokenAmount = underlyingAmount * factor;
+        } else if (underlyingDecimals > SUPERTOKEN_DECIMALS) {
+            factor = 10 ** (underlyingDecimals - SUPERTOKEN_DECIMALS);
+            superTokenAmount = underlyingAmount / factor;
+        } else {
+            superTokenAmount = underlyingAmount;
+        }
+    }
+}
+
+contract NonprofitUniswapLiquidityMover is UniswapLiquidityMover {
+    constructor(
+        IUniswapSwapRouter _swapRouter02,
+        ISETH _nativeAssetSuperToken,
+        IERC20 _nativeAssetERC20
+    )
+        UniswapLiquidityMover(_swapRouter02, _nativeAssetSuperToken, _nativeAssetERC20)
+    {
+        // Additional initialization for the derived contract can go here
+    }
+
+    function moveLiquidity(Torex torex) external returns (bool) {
         transientStorage.torex = torex;
 
         torex.moveLiquidity(bytes(""));
@@ -200,136 +343,5 @@ contract NonprofitUniswapLiquidityMover is ILiquidityMover {
         // ---
 
         return true;
-    }
-
-    function _prepareInToken(
-        ISuperToken inToken,
-        uint256 inAmount
-    )
-        private
-        returns (IERC20 swapInToken, uint256 swapInAmount)
-    {
-        uint256 inTokenBalance = inToken.balanceOf(address(this));
-        assert(inTokenBalance >= inAmount); // We always expect the inAmount to be transferred to this contract.
-
-        (SuperTokenType inTokenType, address inTokenUnderlyingToken) = _getSuperTokenType(inToken);
-        if (inTokenType == SuperTokenType.Wrapper) {
-            inToken.downgrade(inTokenBalance);
-            // Note that this can leave some dust behind when underlying token decimals differ.
-            swapInToken = IERC20(inTokenUnderlyingToken);
-        } else if (inTokenType == SuperTokenType.NativeAsset) {
-            ISETH(address(inToken)).downgradeToETH(inTokenBalance);
-            if (address(WETH) != address(0)) {
-                WETH.deposit{ value: address(this).balance }();
-                swapInToken = WETH;
-            } else {
-                swapInToken = ERC20ETH;
-            }
-        } else {
-            // Pure Super Token
-            swapInToken = inToken;
-        }
-        swapInAmount = swapInToken.balanceOf(address(this));
-    }
-
-    function _prepareOutToken(
-        ISuperToken outToken,
-        uint256 outAmount
-    )
-        private
-        view
-        returns (
-            SuperTokenType outTokenType,
-            IERC20 swapOutToken,
-            uint256 swapOutAmountMinimum,
-            uint256 outAmountAdjusted
-        )
-    {
-        address outTokenUnderlyingToken;
-        (outTokenType, outTokenUnderlyingToken) = _getSuperTokenType(outToken);
-
-        if (outTokenType == SuperTokenType.Wrapper) {
-            swapOutToken = IERC20(outTokenUnderlyingToken);
-            outAmountAdjusted = _adjustOutAmount(outAmount, outToken.getUnderlyingDecimals());
-            (swapOutAmountMinimum,) = outToken.toUnderlyingAmount(outAmountAdjusted);
-        } else if (outTokenType == SuperTokenType.NativeAsset) {
-            if (address(WETH) != address(0)) {
-                swapOutToken = WETH;
-            } else {
-                swapOutToken = ERC20ETH;
-            }
-            outAmountAdjusted = outAmount;
-            swapOutAmountMinimum = outAmount;
-        } else {
-            // Pure Super Token
-            swapOutToken = outToken;
-            outAmountAdjusted = outAmount;
-            swapOutAmountMinimum = outAmount;
-        }
-    }
-
-    enum SuperTokenType {
-        Pure,
-        Wrapper,
-        NativeAsset
-    }
-
-    function _getSuperTokenType(ISuperToken superToken)
-        private
-        view
-        returns (SuperTokenType, address underlyingTokenAddress)
-    {
-        // TODO: Allow for optimization from off-chain set-up?
-        bool isNativeAssetSuperToken = address(superToken) == address(SETH);
-        if (isNativeAssetSuperToken) {
-            return (SuperTokenType.NativeAsset, address(0));
-            // Note that there are a few exceptions where Native Asset Super Tokens have an underlying token,
-            // but we don't want to use it, hence we don't return it.
-        } else {
-            address underlyingToken = superToken.getUnderlyingToken();
-            if (underlyingToken != address(0)) {
-                return (SuperTokenType.Wrapper, underlyingToken);
-            } else {
-                return (SuperTokenType.Pure, address(0));
-            }
-        }
-    }
-
-    function _adjustOutAmount(
-        uint256 outAmount, // 18 decimals
-        uint8 underlyingTokenDecimals
-    )
-        private
-        pure
-        returns (uint256 outAmountAdjusted)
-    {
-        if (underlyingTokenDecimals < SUPERTOKEN_DECIMALS) {
-            uint256 factor = 10 ** (SUPERTOKEN_DECIMALS - underlyingTokenDecimals);
-            outAmountAdjusted = ((outAmount / factor) + 1) * factor; // Effectively rounding up.
-        }
-        // No need for adjustment when the underlying token has greater or equal decimals.
-        else {
-            outAmountAdjusted = outAmount;
-        }
-    }
-
-    function _toSuperTokenAmount(
-        uint256 underlyingAmount,
-        uint8 underlyingDecimals
-    )
-        private
-        pure
-        returns (uint256 superTokenAmount)
-    {
-        uint256 factor;
-        if (underlyingDecimals < SUPERTOKEN_DECIMALS) {
-            factor = 10 ** (SUPERTOKEN_DECIMALS - underlyingDecimals);
-            superTokenAmount = underlyingAmount * factor;
-        } else if (underlyingDecimals > SUPERTOKEN_DECIMALS) {
-            factor = 10 ** (underlyingDecimals - SUPERTOKEN_DECIMALS);
-            superTokenAmount = underlyingAmount / factor;
-        } else {
-            superTokenAmount = underlyingAmount;
-        }
     }
 }
