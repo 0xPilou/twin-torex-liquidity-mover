@@ -43,6 +43,7 @@ verbosity = 4
 optimism = { key = "${API_KEY_OPTIMISTIC_ETHERSCAN}", chain = 10 }
 polygon = { key = "${API_KEY_POLYGONSCAN}" }
 polygon_mumbai = { key = "${API_KEY_POLYGONSCAN}", chain = 80001 }
+base = { key = "${API_KEY_BASESCAN}", chain = 8453 }
 # sepolia = { key = "${API_KEY_ETHERSCAN}" }
 # celo = { key = "${API_KEY_CELOSCAN}", chain = 42220 }
 

@@ -4,7 +4,7 @@ pragma solidity =0.8.15;
 import { ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { IUniswapSwapRouter, UniswapLiquidityMover } from "../src/LiquidityMover.sol";
+import { IUniswapSwapRouter, NonprofitUniswapLiquidityMover as UniswapLiquidityMover } from "../src/LiquidityMover.sol";
 
 import { BaseScript } from "./Base.s.sol";
 
@@ -14,9 +14,9 @@ contract Deploy is BaseScript {
         liquidityMover = new UniswapLiquidityMover(
             // IUniswapSwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564),
             // ISETH(0x96B82B65ACF7072eFEb00502F45757F254c2a0D4)
-            IUniswapSwapRouter(0x5615CDAb10dc425a742d643d949a7F474C01abc4),
-            ISETH(0x671425Ae1f272Bc6F79beC3ed5C4b00e9c628240),
-            IERC20(0x471EcE3750Da237f93B8E339c536989b8978a438)
+            IUniswapSwapRouter(0x2626664c2603336E57B271c5C0b26F421741e481),
+            ISETH(0x46fd5cfB4c12D87acD3a13e92BAa53240C661D93),
+            IERC20(address(0))
         );
     }
 }

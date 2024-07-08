@@ -69,7 +69,7 @@ struct Config {
 
 interface IUniswapSwapRouter is IV3SwapRouter, IPeripheryImmutableState { }
 
-contract UniswapLiquidityMover is ILiquidityMover {
+contract NonprofitUniswapLiquidityMover is ILiquidityMover {
     uint8 private constant SUPERTOKEN_DECIMALS = 18;
 
     IUniswapSwapRouter public immutable swapRouter;
@@ -129,7 +129,6 @@ contract UniswapLiquidityMover is ILiquidityMover {
     function moveLiquidityCallback(
         ISuperToken inToken,
         ISuperToken outToken,
-        // TODO: Rename or add comments? Alternative names could be `sentInAmount` and `minOutAmount`.
         uint256 inAmount,
         uint256 minOutAmount,
         bytes calldata /* moverData */
