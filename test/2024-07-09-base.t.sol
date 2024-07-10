@@ -19,10 +19,7 @@ contract LiquidityMoverTests is PRBTest {
     SwapRouter02LiquidityMover internal sut;
 
     function _setUpForkAndSut(uint256 blockNumber) private {
-        vm.createSelectFork({
-            urlOrAlias: "https://base-mainnet.g.alchemy.com/v2/VAo_u4IK2BocQy8xJ1r493e3fNhj8S3P",
-            blockNumber: blockNumber
-        });
+        vm.createSelectFork({ urlOrAlias: vm.envString("BASE_RPC"), blockNumber: blockNumber });
 
         sut = new SwapRouter02LiquidityMover(
             IUniswapSwapRouter(0x2626664c2603336E57B271c5C0b26F421741e481), // "SwapRouter02"! (not just "SwapRouter")
