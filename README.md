@@ -17,11 +17,11 @@ This repository is based on the [Foundry Template by Paul Razvan Berg](https://g
 6. For "What to trigger", select "Transaction".
 7. For "Target Smart Contract", select the network and enter the address of the deployed contract.
 8. For "Function to be automated", select
-   `moveLiquidity(address: torex, address: rewardAddress, uint256: minRewardAmount)`
+   `moveLiquidity(address: torex, address: rewardAddress, uint256: rewardAmountMinimum)`
 9. Arguments:
    - `torex`: The address of the TOREX you want to move liquidity for.
    - `rewardAddress`: The address for which the profit of the liquidity movement is sent.
-   - `minRewardAmount`: The minimum amount of reward to be made in the quote tokens. Do account for gas cost so the
+   - `rewardAmountMinimum`: The minimum amount of reward to be made in the quote tokens. Do account for gas cost so the
      reward amount would cover it.
 10. For "Task Properties", give the task a name.
 11. Create the task by clicking on "Create Task" and signing the transaction.

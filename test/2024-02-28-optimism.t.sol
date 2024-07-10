@@ -9,12 +9,14 @@ import { StdCheats } from "forge-std/StdCheats.sol";
 import { ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 import { IWETH9 } from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
 
-import { ILiquidityMover, UniswapLiquidityMover, IUniswapSwapRouter, Torex, Config } from "../src/LiquidityMover.sol";
+import { ILiquidityMover, IUniswapSwapRouter, Torex, TorexConfig } from "../src/ILiquidityMover.sol";
+
+import { SwapRouter02LiquidityMover } from "../src/SwapRouter02LiquidityMover.sol";
 
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 
 contract LiquidityMoverTests is PRBTest {
-    UniswapLiquidityMover internal sut;
+    SwapRouter02LiquidityMover internal sut;
 
     IERC20 internal constant OPx = IERC20(0x1828Bff08BD244F7990edDCd9B19cc654b33cDB4);
     IERC20 internal constant OP = IERC20(0x4200000000000000000000000000000000000042);
@@ -25,14 +27,12 @@ contract LiquidityMoverTests is PRBTest {
     function setUp() public {
         // Otherwise, run the test against the mainnet fork.
         // todo: env variable
-        vm.createSelectFork({
-            urlOrAlias: "https://opt-mainnet.g.alchemy.com/v2/9fhll0R2q_65eilDZmD4AiUULqr6Ae2a",
-            blockNumber: 116_756_644
-        });
+        vm.createSelectFork({ urlOrAlias: vm.envString("OPTIMISM_RPC"), blockNumber: 116_756_644 });
 
-        sut = new UniswapLiquidityMover(
+        sut = new SwapRouter02LiquidityMover(
             IUniswapSwapRouter(0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45), // "SwapRouter02"! (not just "SwapRouter")
-            ISETH(0x4ac8bD1bDaE47beeF2D1c6Aa62229509b962Aa0d) // The Super Token on for Native Asset on Optimism
+            ISETH(0x4ac8bD1bDaE47beeF2D1c6Aa62229509b962Aa0d), // The Super Token on for Native Asset on Optimism
+            IERC20(address(0))
         );
     }
 
@@ -54,14 +54,31 @@ contract LiquidityMoverTests is PRBTest {
     }
 
     function _testTorex(Torex torex, address rewardToken) internal {
-        address rewardAddress = address(0xa5F402E7B32aBf648C9B0638bb0FAb275AA445b7);
+        sut.moveLiquidity(torex);
 
-        uint256 rewardAmount = 10;
-        assertTrue(sut.moveLiquidity(torex, rewardAddress, rewardAmount));
+        ISuperToken outToken = torex.getConfig().outToken;
+        assertEq(outToken.balanceOf(address(sut)), 0);
+        address outTokenUnderlying = outToken.getUnderlyingToken();
+        if (outTokenUnderlying != address(0)) {
+            assertLte(IERC20(outTokenUnderlying).balanceOf(address(sut)), 0);
+        }
 
-        assertEq(torex.getConfig().outToken.balanceOf(address(sut)), 0);
         assertEq(IERC20(rewardToken).balanceOf(address(sut)), 0);
+        assertEq(IERC20(rewardToken).balanceOf(address(torex)), 0);
+
+        ISuperToken inToken = torex.getConfig().inToken;
+
+        address inTokenUnderlying = inToken.getUnderlyingToken();
+        uint8 inTokenDecimals = inToken.getUnderlyingDecimals();
+        if (inTokenDecimals < 18) {
+            assertLte(inToken.balanceOf(address(sut)), 1_000_000_000_000);
+        } else {
+            assertLte(inToken.balanceOf(address(sut)), 0);
+        }
+
+        if (inTokenUnderlying != address(0)) {
+            assertEq(IERC20(inTokenUnderlying).balanceOf(address(sut)), 0);
+        }
         assertEq(address(sut).balance, 0);
-        assertGte(IERC20(rewardToken).balanceOf(address(rewardAddress)), rewardAmount);
     }
 }
