@@ -12,20 +12,18 @@ import { IWETH9 } from "@uniswap/v3-periphery/contracts/interfaces/external/IWET
 import { ILiquidityMover, IUniswapSwapRouter, Torex, TorexConfig } from "../src/ILiquidityMover.sol";
 
 import { SwapRouter02LiquidityMover } from "../src/SwapRouter02LiquidityMover.sol";
+import { Deploy } from "../script/Deploy.s.sol";
 
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 
 contract LiquidityMoverTests is PRBTest {
+    Deploy deployScript;
     SwapRouter02LiquidityMover internal sut;
 
     function _setUpForkAndSut(uint256 blockNumber) private {
         vm.createSelectFork({ urlOrAlias: vm.envString("BASE_RPC"), blockNumber: blockNumber });
-
-        sut = new SwapRouter02LiquidityMover(
-            IUniswapSwapRouter(0x2626664c2603336E57B271c5C0b26F421741e481), // "SwapRouter02"! (not just "SwapRouter")
-            ISETH(0x46fd5cfB4c12D87acD3a13e92BAa53240C661D93), // The Super Token on for Native Asset on Optimism
-            IERC20(address(0))
-        );
+        deployScript = new Deploy();
+        sut = deployScript.run();
     }
 
     function test_0x76BA7a8a4d8320c6E9D4542255Fb05268f1B48BE() external {

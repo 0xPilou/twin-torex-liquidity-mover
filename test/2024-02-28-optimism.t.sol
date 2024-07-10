@@ -12,10 +12,12 @@ import { IWETH9 } from "@uniswap/v3-periphery/contracts/interfaces/external/IWET
 import { ILiquidityMover, IUniswapSwapRouter, Torex, TorexConfig } from "../src/ILiquidityMover.sol";
 
 import { SwapRouter02LiquidityMover } from "../src/SwapRouter02LiquidityMover.sol";
+import { Deploy } from "../script/Deploy.s.sol";
 
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 
 contract LiquidityMoverTests is PRBTest {
+    Deploy deployScript;
     SwapRouter02LiquidityMover internal sut;
 
     IERC20 internal constant OPx = IERC20(0x1828Bff08BD244F7990edDCd9B19cc654b33cDB4);
@@ -25,15 +27,9 @@ contract LiquidityMoverTests is PRBTest {
     IERC20 internal constant USDC = IERC20(0x7F5c764cBc14f9669B88837ca1490cCa17c31607);
 
     function setUp() public {
-        // Otherwise, run the test against the mainnet fork.
-        // todo: env variable
         vm.createSelectFork({ urlOrAlias: vm.envString("OPTIMISM_RPC"), blockNumber: 116_756_644 });
-
-        sut = new SwapRouter02LiquidityMover(
-            IUniswapSwapRouter(0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45), // "SwapRouter02"! (not just "SwapRouter")
-            ISETH(0x4ac8bD1bDaE47beeF2D1c6Aa62229509b962Aa0d), // The Super Token on for Native Asset on Optimism
-            IERC20(address(0))
-        );
+        deployScript = new Deploy();
+        sut = deployScript.run();
     }
 
     function test_ETHx_to_OPx() external {

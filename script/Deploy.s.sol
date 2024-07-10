@@ -12,13 +12,41 @@ import { BaseScript } from "./Base.s.sol";
 
 /// @dev See the Solidity Scripting tutorial: https://book.getfoundry.sh/tutorials/solidity-scripting
 contract Deploy is BaseScript {
+    struct Config {
+        IUniswapSwapRouter swapRouter02;
+        ISETH seth;
+        IERC20 erc20eth;
+    }
+
     function run() public broadcast returns (SwapRouter02LiquidityMover liquidityMover) {
-        liquidityMover = new SwapRouter02LiquidityMover(
-            // IUniswapSwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564),
-            // ISETH(0x96B82B65ACF7072eFEb00502F45757F254c2a0D4)
-            IUniswapSwapRouter(0x2626664c2603336E57B271c5C0b26F421741e481),
-            ISETH(0x46fd5cfB4c12D87acD3a13e92BAa53240C661D93),
-            IERC20(address(0))
-        );
+        Config memory config = getConfig(block.chainid);
+        liquidityMover = new SwapRouter02LiquidityMover(config.swapRouter02, config.seth, config.erc20eth);
+    }
+
+    function getConfig(uint256 chainid) public pure returns (Config memory deployConfig) {
+        if (chainid == 8453) {
+            // Base
+            deployConfig = Config({
+                swapRouter02: IUniswapSwapRouter(0x2626664c2603336E57B271c5C0b26F421741e481),
+                seth: ISETH(0x46fd5cfB4c12D87acD3a13e92BAa53240C661D93),
+                erc20eth: IERC20(address(0))
+            });
+        } else if (chainid == 10) {
+            // OP Mainnet
+            deployConfig = Config({
+                swapRouter02: IUniswapSwapRouter(0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45),
+                seth: ISETH(0x4ac8bD1bDaE47beeF2D1c6Aa62229509b962Aa0d),
+                erc20eth: IERC20(address(0))
+            });
+        } else if (chainid == 42_220) {
+            // Celo
+            deployConfig = Config({
+                swapRouter02: IUniswapSwapRouter(0x5615CDAb10dc425a742d643d949a7F474C01abc4),
+                seth: ISETH(0x671425Ae1f272Bc6F79beC3ed5C4b00e9c628240),
+                erc20eth: IERC20(0x471EcE3750Da237f93B8E339c536989b8978a438)
+            });
+        } else {
+            revert("Deploy config not available for given network.");
+        }
     }
 }
