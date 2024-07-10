@@ -12,7 +12,6 @@ import { IWETH9 } from "@uniswap/v3-periphery/contracts/interfaces/external/IWET
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 import { ISETHCustom, ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 
-// TODO: get from SuperBoring repo
 /**
  * @dev Interface for the Liquidity Mover contracts.
  */
@@ -36,14 +35,12 @@ interface ILiquidityMover {
         returns (bool);
 }
 
-// TODO: get from SuperBoring repo
 interface Torex {
     function getBenchmarkQuote(uint256 inAmount) external view returns (uint256);
     function moveLiquidity(bytes calldata moverData) external;
     function getConfig() external view returns (TorexConfig memory);
 }
 
-// TODO: get from SuperBoring repo
 interface ITwapObserver {
     /**
      * @dev Get the type id of the observer.
@@ -55,12 +52,10 @@ interface ITwapObserver {
         // 0xac2a7a01d08bec8d803b8d20516dcd7baca72524f2400f9e19acb905302f03e4 for UniswapV3PoolTwapObserver
 }
 
-// TODO: get from SuperBoring repo
 interface IUniswapV3PoolTwapObserver is ITwapObserver {
     function uniPool() external view returns (IUniswapV3Pool);
 }
 
-// TODO: get from SuperBoring repo
 struct TorexConfig {
     ISuperToken inToken;
     ISuperToken outToken;

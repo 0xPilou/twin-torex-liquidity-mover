@@ -43,10 +43,22 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
         IERC20 swapOutToken;
         uint256 swapOutAmountMinimum;
         uint256 swapOutAmountReceived;
+        uint256 outAmountActual;
         address rewardAddress;
         uint256 rewardAmountMinimum;
         uint256 rewardAmount;
     }
+
+    event LiquidityMoverFinished(
+        address indexed torex,
+        address indexed rewardAddress,
+        address inToken,
+        uint256 inAmount,
+        address outToken,
+        uint256 minOutAmount,
+        uint256 outAmountActual,
+        uint256 rewardAmount
+    );
 
     /**
      * @param _swapRouter02 Make sure it's "SwapRouter02"!!! Not just "SwapRouter".
@@ -180,24 +192,37 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
         // # Pay
         if (ctx.rewardAddress == address(0)) {
             // Update all the tokens directly to TOREX.
-            _upgradeAllTokensToSuperTokensIfNecessary(
+            ctx.outAmountActual = _upgradeAllTokensToOutTokensIfNecessary(
                 ctx.swapOutToken, ctx.outToken, ctx.outTokenType, address(ctx.torex)
             );
         } else {
             // Upgrade tokens here.
-            _upgradeAllTokensToSuperTokensIfNecessary(ctx.swapOutToken, ctx.outToken, ctx.outTokenType, address(this));
+            uint256 outTokenBalance =
+                _upgradeAllTokensToOutTokensIfNecessary(ctx.swapOutToken, ctx.outToken, ctx.outTokenType, address(this));
 
             // Send minimum needed amount to TOREX.
-            TransferHelper.safeTransfer(address(ctx.outToken), address(ctx.torex), minOutAmount);
+            ctx.outAmountActual = minOutAmount;
+            TransferHelper.safeTransfer(address(ctx.outToken), address(ctx.torex), ctx.outAmountActual);
 
             // Everything not sent to TOREX is considered as reward.
-            ctx.rewardAmount = ctx.outToken.balanceOf(address(this));
+            ctx.rewardAmount = outTokenBalance - ctx.outAmountActual;
             require(ctx.rewardAmount >= ctx.rewardAmountMinimum, "LiquidityMover: reward too low");
 
             if (ctx.rewardAmount > 0) {
                 TransferHelper.safeTransfer(address(ctx.outToken), ctx.rewardAddress, ctx.rewardAmount);
             }
         }
+
+        emit LiquidityMoverFinished(
+            address(ctx.torex),
+            ctx.rewardAddress,
+            address(ctx.inToken),
+            inAmount,
+            address(ctx.outToken),
+            minOutAmount,
+            ctx.outAmountActual,
+            ctx.rewardAmount
+        );
 
         return true;
     }
@@ -288,13 +313,14 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
         }
     }
 
-    function _upgradeAllTokensToSuperTokensIfNecessary(
+    function _upgradeAllTokensToOutTokensIfNecessary(
         IERC20 swapOutToken,
         ISuperToken outToken,
         SuperTokenType outTokenType,
         address to
     )
         private
+        returns (uint256 outTokenAmount)
     {
         if (outTokenType == SuperTokenType.Wrapper) {
             // Give Super Token maximum allowance if necessary.
@@ -302,20 +328,22 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
             if (swapOutToken.allowance(address(this), address(outToken)) < swapOutTokenBalance) {
                 TransferHelper.safeApprove(address(swapOutToken), address(outToken), type(uint256).max);
             }
-            outToken.upgradeTo(
-                to, _toSuperTokenAmount(swapOutTokenBalance, outToken.getUnderlyingDecimals()), bytes("")
-            );
+            outTokenAmount = _toSuperTokenAmount(swapOutTokenBalance, outToken.getUnderlyingDecimals());
+            outToken.upgradeTo(to, outTokenAmount, bytes(""));
             // Reminder that `upgradeTo` expects Super Token decimals.
             // Small dust mount might remain here.
         } else if (outTokenType == SuperTokenType.NativeAsset) {
             if (address(WETH) != address(0)) {
                 WETH.withdraw(WETH.balanceOf(address(this)));
             }
-            ISETH(address(outToken)).upgradeByETHTo{ value: address(this).balance }(to);
+            outTokenAmount = address(this).balance;
+            ISETH(address(outToken)).upgradeByETHTo{ value: outTokenAmount }(to);
         } else {
             // Pure Super Token
+            outTokenAmount = outToken.balanceOf(address(this));
             if (to != address(this)) {
-                TransferHelper.safeTransfer(address(outToken), to, outToken.balanceOf(address(this)));
+                // Only makes sense to transfer if destination is other than current address.
+                TransferHelper.safeTransfer(address(outToken), to, outTokenAmount);
             }
         }
     }

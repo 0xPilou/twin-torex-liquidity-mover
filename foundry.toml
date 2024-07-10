@@ -67,6 +67,6 @@ wrap_comments = true
 # goerli = "https://goerli.infura.io/v3/${API_KEY_INFURA}"
 # localhost = "http://localhost:8545"
 # mainnet = "https://eth-mainnet.g.alchemy.com/v2/${API_KEY_ALCHEMY}"
-# optimism = "https://optimism-mainnet.infura.io/v3/${API_KEY_INFURA}"
+optimism = "${OPTIMISM_RPC}"
 # polygon = "https://polygon-mainnet.infura.io/v3/${API_KEY_INFURA}"
 # sepolia = "https://sepolia.infura.io/v3/${API_KEY_INFURA}"

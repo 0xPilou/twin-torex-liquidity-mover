@@ -27,10 +27,7 @@ contract LiquidityMoverTests is PRBTest {
     function setUp() public {
         // Otherwise, run the test against the mainnet fork.
         // todo: env variable
-        vm.createSelectFork({
-            urlOrAlias: "https://opt-mainnet.g.alchemy.com/v2/9fhll0R2q_65eilDZmD4AiUULqr6Ae2a",
-            blockNumber: 116_756_644
-        });
+        vm.createSelectFork({ urlOrAlias: vm.envString("OPTIMISM_RPC"), blockNumber: 116_756_644 });
 
         sut = new SwapRouter02LiquidityMover(
             IUniswapSwapRouter(0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45), // "SwapRouter02"! (not just "SwapRouter")
