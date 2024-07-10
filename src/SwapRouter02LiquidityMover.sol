@@ -98,24 +98,30 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
         _moveLiquidity(torex, msg.sender, 0, bytes(""));
     }
 
-    function moveLiquidityForReward(Torex torex, uint256 minRewardAmount) external {
-        _moveLiquidity(torex, msg.sender, minRewardAmount, bytes(""));
+    function moveLiquidityForReward(Torex torex, uint256 rewardAmountMinimum) external {
+        _moveLiquidity(torex, msg.sender, rewardAmountMinimum, bytes(""));
     }
 
     function moveLiquidityForReward(Torex torex, address rewardAddress) external {
         _moveLiquidity(torex, rewardAddress, 0, bytes(""));
     }
 
-    function moveLiquidityForReward(Torex torex, address rewardAddress, uint256 minRewardAmount) external {
-        _moveLiquidity(torex, rewardAddress, minRewardAmount, bytes(""));
+    function moveLiquidityForReward(Torex torex, address rewardAddress, uint256 rewardAmountMinimum) external {
+        _moveLiquidity(torex, rewardAddress, rewardAmountMinimum, bytes(""));
     }
 
     function moveLiquidityForRewardWithPath(Torex torex, bytes calldata swapPath) external {
         _moveLiquidity(torex, msg.sender, 0, swapPath);
     }
 
-    function moveLiquidityForRewardWithPath(Torex torex, uint256 minRewardAmount, bytes calldata swapPath) external {
-        _moveLiquidity(torex, msg.sender, minRewardAmount, swapPath);
+    function moveLiquidityForRewardWithPath(
+        Torex torex,
+        uint256 rewardAmountMinimum,
+        bytes calldata swapPath
+    )
+        external
+    {
+        _moveLiquidity(torex, msg.sender, rewardAmountMinimum, swapPath);
     }
 
     function moveLiquidityForRewardWithPath(Torex torex, address rewardAddress, bytes calldata swapPath) external {
@@ -125,23 +131,23 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
     function moveLiquidityForRewardWithPath(
         Torex torex,
         address rewardAddress,
-        uint256 minRewardAmount,
+        uint256 rewardAmountMinimum,
         bytes calldata swapPath
     )
         external
     {
-        _moveLiquidity(torex, rewardAddress, minRewardAmount, swapPath);
+        _moveLiquidity(torex, rewardAddress, rewardAmountMinimum, swapPath);
     }
 
     function _moveLiquidity(
         Torex torex,
         address rewardAddress,
-        uint256 minRewardAmount,
+        uint256 rewardAmountMinimum,
         bytes memory swapPath
     )
         private
     {
-        Context memory ctx = _initializeContext(torex, rewardAddress, minRewardAmount, swapPath);
+        Context memory ctx = _initializeContext(torex, rewardAddress, rewardAmountMinimum, swapPath);
         torex.moveLiquidity(abi.encode(ctx));
     }
 
