@@ -36,7 +36,7 @@ Do note that for automation transactions to be executed by Gelato, you need to y
 
 - https://basescan.org/address/0x06f38def746ad22417940f580858ab36b2e6614c
 - https://optimistic.etherscan.io/address/0xb32d94537591a899b13f7923a0f2cd0200a1ca84
-- https://explorer.celo.org/mainnet/address/0x8B25D8a48d1FB17C9aF7765c797CA38B78614729
+- https://celoscan.io/address/0x8B25D8a48d1FB17C9aF7765c797CA38B78614729
 
 ## License
 
