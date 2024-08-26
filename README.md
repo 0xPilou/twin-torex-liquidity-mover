@@ -32,6 +32,11 @@ Do note that for automation transactions to be executed by Gelato, you need to y
 
 ## Deployments
 
+### 2024-08-26
+- Celo: https://celoscan.io/address/0x83bf283857c787923e7271a0bafdb44228688be0
+- Optimism: https://optimistic.etherscan.io/address/0xb2c22f1a0dddb6222dae2f29269c703d3b76ac3b
+- Base: https://basescan.org/address/0x1e77916e3fed4a24dc4e37968587e2b71d3a9c06
+
 ### 2024-07-11
 
 - https://basescan.org/address/0x06f38def746ad22417940f580858ab36b2e6614c

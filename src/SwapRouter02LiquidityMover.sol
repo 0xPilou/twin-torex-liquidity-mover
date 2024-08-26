@@ -13,7 +13,12 @@ import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/in
 import { ISETHCustom, ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 
 import {
-    IUniswapSwapRouter, Torex, IUniswapV3PoolTwapObserver, TorexConfig, ILiquidityMover
+    IUniswapSwapRouter,
+    Torex,
+    ITwapObserver,
+    IUniswapV3PoolTwapObserver,
+    TorexConfig,
+    ILiquidityMover
 } from "./ILiquidityMover.sol";
 
 contract SwapRouter02LiquidityMover is ILiquidityMover {
@@ -33,7 +38,7 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
     struct Context {
         Torex torex;
         bytes swapPath;
-        IUniswapV3PoolTwapObserver observer;
+        ITwapObserver observer;
         ISuperToken inToken;
         ISuperToken outToken;
         IERC20 swapInToken;
@@ -181,8 +186,15 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
 
         // Set default swap path if not specified explicitly.
         if (ctx.swapPath.length == 0) {
-            ctx.swapPath =
-                abi.encodePacked(address(ctx.swapInToken), ctx.observer.uniPool().fee(), address(ctx.swapOutToken));
+            require(
+                ctx.observer.getTypeId() == keccak256("UniswapV3PoolTwapObserver"),
+                "LiquidityMover: when trade path is not provided, observer must be a UniswapV3PoolTwapObserver to determine the default swap path."
+            );
+            ctx.swapPath = abi.encodePacked(
+                address(ctx.swapInToken),
+                IUniswapV3PoolTwapObserver(address(ctx.observer)).uniPool().fee(),
+                address(ctx.swapOutToken)
+            );
         }
 
         // Single swap guide about Swap Router: https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps
@@ -250,11 +262,7 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
 
         TorexConfig memory torexConfig = ctx.torex.getConfig();
 
-        ctx.observer = IUniswapV3PoolTwapObserver(address(torexConfig.observer));
-        require(
-            ctx.observer.getTypeId() == keccak256("UniswapV3PoolTwapObserver"),
-            "LiquidityMover: unsupported observer type. This liquidity mover only for for Uniswap-based TWAP observers."
-        );
+        ctx.observer = ITwapObserver(address(torexConfig.observer));
 
         ctx.inToken = torexConfig.inToken;
         ctx.outToken = torexConfig.outToken;
