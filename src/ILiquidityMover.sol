@@ -39,6 +39,10 @@ interface Torex {
     function getBenchmarkQuote(uint256 inAmount) external view returns (uint256);
     function moveLiquidity(bytes calldata moverData) external;
     function getConfig() external view returns (TorexConfig memory);
+    function getLiquidityEstimations()
+        external
+        view
+        returns (uint256 inAmount, uint256 minOutAmount, uint256 durationSinceLastLME, uint256 twapSinceLastLME);
 }
 
 interface ITwapObserver {
