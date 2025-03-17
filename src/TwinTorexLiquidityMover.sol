@@ -184,12 +184,12 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
     receive() external payable { }
 
     /**
-     * @notice Moves liquidity between two Torexes
+     * @notice Moves liquidity between two Torexes for a specific reward sent to the caller
      * @param torex0 The first Torex
      * @param torex1 The second Torex
      */
-    function moveLiquidity(Torex torex0, Torex torex1) external {
-        _moveLiquidity(torex0, torex1, address(0), 0, bytes(""));
+    function moveLiquidityForReward(Torex torex0, Torex torex1) external {
+        _moveLiquidity(torex0, torex1, msg.sender, 0, bytes(""));
     }
 
     /**
@@ -208,6 +208,36 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
         external
     {
         _moveLiquidity(torex0, torex1, rewardAddress, rewardAmountMinimum, bytes(""));
+    }
+
+    /**
+     * @notice Moves liquidity between two Torexes for a reward sent to the caller with a custom swap path
+     * @param torex0 The first Torex
+     * @param torex1 The second Torex
+     * @param swapPath The encoded swap path to use for token swaps
+     */
+    function moveLiquidityForRewardWithPath(Torex torex0, Torex torex1, bytes calldata swapPath) external {
+        _moveLiquidity(torex0, torex1, msg.sender, 0, swapPath);
+    }
+
+    /**
+     * @notice Moves liquidity between two Torexes for a specific reward address with a custom swap path
+     * @param torex0 The first Torex
+     * @param torex1 The second Torex
+     * @param rewardAddress The address that will receive the rewards
+     * @param rewardAmountMinimum The minimum reward amount that must be received
+     * @param swapPath The encoded swap path to use for token swaps
+     */
+    function moveLiquidityForRewardWithPath(
+        Torex torex0,
+        Torex torex1,
+        address rewardAddress,
+        uint256 rewardAmountMinimum,
+        bytes calldata swapPath
+    )
+        external
+    {
+        _moveLiquidity(torex0, torex1, rewardAddress, rewardAmountMinimum, swapPath);
     }
 
     /**
