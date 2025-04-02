@@ -1,25 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity =0.8.15; // TODO: Forced this because IWETH9 required 0.8.15.
+pragma solidity ^0.8.24;
 
+/* OpenZeppelin Imports */
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+/* Uniswap Imports */
 import { TransferHelper } from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
+import { IUniswapSwapRouter } from "./interfaces/IUniswapSwapRouter.sol";
 import { IV3SwapRouter } from "@uniswap/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
-import { IPeripheryImmutableState } from "@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol";
 import { IWETH9 } from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
 
+/* Superfluid Imports */
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
-import { ISETHCustom, ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
+import { ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 
-import {
-    IUniswapSwapRouter,
-    Torex,
-    ITwapObserver,
-    IUniswapV3PoolTwapObserver,
-    TorexConfig,
-    ILiquidityMover
-} from "./ILiquidityMover.sol";
+/* Superboring Imports */
+import { ITorex, TorexConfig } from "./interfaces/superboring/ITorex.sol";
+import { ILiquidityMover } from "./interfaces/superboring/ILiquidityMover.sol";
+import { ITwapObserver } from "./interfaces/superboring/ITwapObserver.sol";
+import { IUniswapV3PoolTwapObserver } from "./interfaces/superboring/IUniswapV3PoolTwapObserver.sol";
 
 contract SwapRouter02LiquidityMover is ILiquidityMover {
     uint8 private constant SUPERTOKEN_DECIMALS = 18;
@@ -36,7 +35,7 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
     }
 
     struct Context {
-        Torex torex;
+        ITorex torex;
         bytes swapPath;
         ITwapObserver observer;
         ISuperToken inToken;
@@ -91,36 +90,36 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
 
     receive() external payable { }
 
-    function moveLiquidity(Torex torex) external {
+    function moveLiquidity(ITorex torex) external {
         _moveLiquidity(torex, address(0), 0, bytes(""));
     }
 
-    function moveLiquidityWithPath(Torex torex, bytes calldata swapPath) external {
+    function moveLiquidityWithPath(ITorex torex, bytes calldata swapPath) external {
         _moveLiquidity(torex, address(0), 0, swapPath);
     }
 
-    function moveLiquidityForReward(Torex torex) external {
+    function moveLiquidityForReward(ITorex torex) external {
         _moveLiquidity(torex, msg.sender, 0, bytes(""));
     }
 
-    function moveLiquidityForReward(Torex torex, uint256 rewardAmountMinimum) external {
+    function moveLiquidityForReward(ITorex torex, uint256 rewardAmountMinimum) external {
         _moveLiquidity(torex, msg.sender, rewardAmountMinimum, bytes(""));
     }
 
-    function moveLiquidityForReward(Torex torex, address rewardAddress) external {
+    function moveLiquidityForReward(ITorex torex, address rewardAddress) external {
         _moveLiquidity(torex, rewardAddress, 0, bytes(""));
     }
 
-    function moveLiquidityForReward(Torex torex, address rewardAddress, uint256 rewardAmountMinimum) external {
+    function moveLiquidityForReward(ITorex torex, address rewardAddress, uint256 rewardAmountMinimum) external {
         _moveLiquidity(torex, rewardAddress, rewardAmountMinimum, bytes(""));
     }
 
-    function moveLiquidityForRewardWithPath(Torex torex, bytes calldata swapPath) external {
+    function moveLiquidityForRewardWithPath(ITorex torex, bytes calldata swapPath) external {
         _moveLiquidity(torex, msg.sender, 0, swapPath);
     }
 
     function moveLiquidityForRewardWithPath(
-        Torex torex,
+        ITorex torex,
         uint256 rewardAmountMinimum,
         bytes calldata swapPath
     )
@@ -129,12 +128,12 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
         _moveLiquidity(torex, msg.sender, rewardAmountMinimum, swapPath);
     }
 
-    function moveLiquidityForRewardWithPath(Torex torex, address rewardAddress, bytes calldata swapPath) external {
+    function moveLiquidityForRewardWithPath(ITorex torex, address rewardAddress, bytes calldata swapPath) external {
         _moveLiquidity(torex, rewardAddress, 0, swapPath);
     }
 
     function moveLiquidityForRewardWithPath(
-        Torex torex,
+        ITorex torex,
         address rewardAddress,
         uint256 rewardAmountMinimum,
         bytes calldata swapPath
@@ -145,7 +144,7 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
     }
 
     function _moveLiquidity(
-        Torex torex,
+        ITorex torex,
         address rewardAddress,
         uint256 rewardAmountMinimum,
         bytes memory swapPath
@@ -246,7 +245,7 @@ contract SwapRouter02LiquidityMover is ILiquidityMover {
     }
 
     function _initializeContext(
-        Torex torex,
+        ITorex torex,
         address rewardAddress,
         uint256 rewardAmountMinimum,
         bytes memory swapPath

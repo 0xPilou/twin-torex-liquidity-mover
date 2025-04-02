@@ -1,27 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity =0.8.15; // TODO: Forced this because IWETH9 required 0.8.15.
+pragma solidity ^0.8.24;
 
 /* OpenZeppelin Imports */
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IWETH9 } from "./interfaces/IWETH9.sol";
 
 /* UniswapV3 Imports */
 import { TransferHelper } from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 import { IV3SwapRouter } from "@uniswap/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
-
+import { IUniswapSwapRouter } from "./interfaces/IUniswapSwapRouter.sol";
 /* Superfluid Imports */
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 import { ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 
-/* Internal Imports */
-import {
-    IUniswapSwapRouter,
-    IWETH9,
-    Torex,
-    ITwapObserver,
-    IUniswapV3PoolTwapObserver,
-    TorexConfig,
-    ILiquidityMover
-} from "./ILiquidityMover.sol";
+/* Superboring Imports */
+import { ITorex, TorexConfig } from "./interfaces/superboring/ITorex.sol";
+import { ILiquidityMover } from "./interfaces/superboring/ILiquidityMover.sol";
+import { ITwapObserver } from "./interfaces/superboring/ITwapObserver.sol";
+import { IUniswapV3PoolTwapObserver } from "./interfaces/superboring/IUniswapV3PoolTwapObserver.sol";
 
 /**
  * @title TwinTorexLiquidityMover Contract
@@ -85,8 +81,8 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @param rewardAmountMinimum The minimum reward amount that must be received
      */
     struct Context {
-        Torex richTorex;
-        Torex poorTorex;
+        ITorex richTorex;
+        ITorex poorTorex;
         bytes richTorexSwapPath;
         ITwapObserver richTorexObserver;
         address rewardAddress;
@@ -188,7 +184,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @param torex0 The first Torex
      * @param torex1 The second Torex
      */
-    function moveLiquidityForReward(Torex torex0, Torex torex1) external {
+    function moveLiquidityForReward(ITorex torex0, ITorex torex1) external {
         _moveLiquidity(torex0, torex1, msg.sender, 0, bytes(""));
     }
 
@@ -200,8 +196,8 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @param rewardAmountMinimum The minimum reward amount that must be received
      */
     function moveLiquidityForReward(
-        Torex torex0,
-        Torex torex1,
+        ITorex torex0,
+        ITorex torex1,
         address rewardAddress,
         uint256 rewardAmountMinimum
     )
@@ -216,7 +212,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @param torex1 The second Torex
      * @param swapPath The encoded swap path to use for token swaps
      */
-    function moveLiquidityForRewardWithPath(Torex torex0, Torex torex1, bytes calldata swapPath) external {
+    function moveLiquidityForRewardWithPath(ITorex torex0, ITorex torex1, bytes calldata swapPath) external {
         _moveLiquidity(torex0, torex1, msg.sender, 0, swapPath);
     }
 
@@ -229,8 +225,8 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @param swapPath The encoded swap path to use for token swaps
      */
     function moveLiquidityForRewardWithPath(
-        Torex torex0,
-        Torex torex1,
+        ITorex torex0,
+        ITorex torex1,
         address rewardAddress,
         uint256 rewardAmountMinimum,
         bytes calldata swapPath
@@ -340,8 +336,8 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @return ctx The initialized context
      */
     function _initializeContext(
-        Torex richTorex,
-        Torex poorTorex,
+        ITorex richTorex,
+        ITorex poorTorex,
         address rewardAddress,
         uint256 rewardAmountMinimum,
         bytes memory swapPath
@@ -376,8 +372,8 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @param swapPath The encoded swap path for the rich Torex's tokens
      */
     function _moveLiquidity(
-        Torex torex0,
-        Torex torex1,
+        ITorex torex0,
+        ITorex torex1,
         address rewardAddress,
         uint256 rewardAmountMinimum,
         bytes memory swapPath
@@ -388,8 +384,8 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
         (uint256 t0InAmount, uint256 t0MinOutAmount,,) = torex0.getLiquidityEstimations();
         (uint256 t1InAmount, uint256 t1MinOutAmount,,) = torex1.getLiquidityEstimations();
 
-        Torex richTorex;
-        Torex poorTorex;
+        ITorex richTorex;
+        ITorex poorTorex;
 
         // Define which Torex (RichTorex) can pay for its twin Torex (PoorTorex) LME.
         if (t0InAmount >= t1MinOutAmount) {

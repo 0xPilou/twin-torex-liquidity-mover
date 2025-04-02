@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity =0.8.15;
+pragma solidity ^0.8.24;
 
 import { PRBTest } from "@prb/test/PRBTest.sol";
 
-import { Torex, TorexConfig } from "../src/ILiquidityMover.sol";
+import { ITorex, TorexConfig } from "../src/interfaces/superboring/ITorex.sol";
 import { console2 } from "forge-std/console2.sol";
 
 import { TwinTorexLiquidityMover } from "../src/TwinTorexLiquidityMover.sol";
@@ -27,93 +27,98 @@ contract TTLiquidityMoverTests is PRBTest {
         blm = deployBLMScript.run();
     }
 
-    function test_twinTorexLM() external {
+    function test_twinTorexLM_ETH_USDC() external {
         _setUpForkAndSut(27_578_099);
         _testTTLMTorexWithReward(
-            Torex(0x267264CFB67B015ea23c97C07d609FbFc06aDC17), Torex(0x269F9EF6868F70fB20DDF7CfDf69Fe1DBFD307dE)
+            ITorex(0x267264CFB67B015ea23c97C07d609FbFc06aDC17),
+            ITorex(0x269F9EF6868F70fB20DDF7CfDf69Fe1DBFD307dE),
+            vm.addr(123)
         );
     }
 
-    function test_basicLM() external {
+    function test_basicLM_ETH_USDC() external {
         _setUpForkAndSut(27_578_099);
         _testBLMTorexWithReward(
-            Torex(0x267264CFB67B015ea23c97C07d609FbFc06aDC17), Torex(0x269F9EF6868F70fB20DDF7CfDf69Fe1DBFD307dE)
+            ITorex(0x267264CFB67B015ea23c97C07d609FbFc06aDC17),
+            ITorex(0x269F9EF6868F70fB20DDF7CfDf69Fe1DBFD307dE),
+            vm.addr(123)
         );
     }
 
-    function _testBLMTorexWithReward(Torex torex1, Torex torex2) internal {
+    function test_twinTorexLM_ETH_WSTETH() external {
+        _setUpForkAndSut(27_578_099);
+        _testTTLMTorexWithReward(
+            ITorex(0xd21549892BF317CCFe7fB220dcF14aB15dFE5428),
+            ITorex(0x78EfCd2bc1175D69863b1c9aAC9996b766c07A3A),
+            vm.addr(123)
+        );
+    }
+
+    function test_basicLM_ETH_WSTETH() external {
+        _setUpForkAndSut(27_578_099);
+        _testBLMTorexWithReward(
+            ITorex(0xd21549892BF317CCFe7fB220dcF14aB15dFE5428),
+            ITorex(0x78EfCd2bc1175D69863b1c9aAC9996b766c07A3A),
+            vm.addr(123)
+        );
+    }
+
+    function test_twinTorexLM_USDC_cbBTC() external {
+        _setUpForkAndSut(27_715_462);
+        _testTTLMTorexWithReward(
+            ITorex(0x9777e77E7813dc44EC9da7Bfca69042641eB56d9),
+            ITorex(0xA8E5F011F72088E3113E2f4F8C3FB119Fc2E226C),
+            vm.addr(123)
+        );
+    }
+
+    function test_basicLM_USDC_cbBTC() external {
+        _setUpForkAndSut(27_715_462);
+        _testBLMTorexWithReward(
+            ITorex(0x9777e77E7813dc44EC9da7Bfca69042641eB56d9),
+            ITorex(0xA8E5F011F72088E3113E2f4F8C3FB119Fc2E226C),
+            vm.addr(123)
+        );
+    }
+
+    function _testBLMTorexWithReward(ITorex torex1, ITorex torex2, address rewardAddress) internal {
         TorexConfig memory torexConfig = torex1.getConfig();
         ISuperToken inToken = torexConfig.inToken;
         ISuperToken outToken = torexConfig.outToken;
 
-        address rewardAddress = vm.addr(123);
-
         assertEq(outToken.balanceOf(rewardAddress), 0, "Reward address should start with no funds.");
         assertEq(inToken.balanceOf(rewardAddress), 0, "Reward address should start with no funds.");
 
-        // uint256 torexInTokenBalanceBefore = inToken.balanceOf(address(torex));
+        uint256 gasBefore = gasleft();
 
         blm.moveLiquidityForReward(torex1, rewardAddress, 1);
         blm.moveLiquidityForReward(torex2, rewardAddress, 1);
 
-        console2.log("BLM : outToken balance of reward address", outToken.balanceOf(rewardAddress));
-        console2.log("BLM : inToken balance of reward address", inToken.balanceOf(rewardAddress));
-        console2.log("BLM : outToken address", address(outToken));
-        console2.log("BLM : inToken address", address(inToken));
-        // assertGt(outToken.balanceOf(rewardAddress), 0, "Reward address balance should increase.");
+        console2.log("BLM - Token 0 :", outToken.name());
+        console2.log("BLM - Token 1 :", inToken.name());
 
-        // assertGt(
-        //     torexInTokenBalanceBefore,
-        //     inToken.balanceOf(address(torex)),
-        //     "The in tokens of TOREX should increase as they get used."
-        // );
-
-        // uint8 inTokenDecimals = inToken.getUnderlyingDecimals();
-        // if (inTokenDecimals < 18) {
-        //     assertLte(inToken.balanceOf(address(sut)), 1_000_000_000_000, "There is too much out token dust in the
-        // LM.");
-        // } else {
-        //     assertLte(inToken.balanceOf(address(sut)), 0, "There is too much out token dust in the LM.");
-        // }
-
-        // assertEq(outToken.balanceOf(address(sut)), 0, "No out token should be left in the LM.");
+        console2.log("BLM - Token 0 - Reward Amount :", outToken.balanceOf(rewardAddress));
+        console2.log("BLM - Token 1 - Reward Amount :", inToken.balanceOf(rewardAddress));
+        console2.log("BLM - Gas used", gasBefore - gasleft());
     }
 
-    function _testTTLMTorexWithReward(Torex torex1, Torex torex2) internal {
+    function _testTTLMTorexWithReward(ITorex torex1, ITorex torex2, address rewardAddress) internal {
         TorexConfig memory torexConfig = torex1.getConfig();
         ISuperToken inToken = torexConfig.inToken;
         ISuperToken outToken = torexConfig.outToken;
 
-        address rewardAddress = vm.addr(123);
-
         assertEq(outToken.balanceOf(rewardAddress), 0, "Reward address should start with no funds.");
         assertEq(inToken.balanceOf(rewardAddress), 0, "Reward address should start with no funds.");
 
-        // uint256 torexInTokenBalanceBefore = inToken.balanceOf(address(torex));
+        uint256 gasBefore = gasleft();
 
         ttlm.moveLiquidityForReward(torex1, torex2, rewardAddress, 1);
 
-        console2.log("TTLM : outToken balance of reward address", outToken.balanceOf(rewardAddress));
-        console2.log("TTLM : inToken balance of reward address", inToken.balanceOf(rewardAddress));
-        console2.log("TTLM : outToken address", address(outToken));
-        console2.log("TTLM : inToken address", address(inToken));
+        console2.log("TTLM - Token 0 :", outToken.name());
+        console2.log("TTLM - Token 1 :", inToken.name());
 
-        // assertGt(outToken.balanceOf(rewardAddress), 0, "Reward address balance should increase.");
-
-        // assertGt(
-        //     torexInTokenBalanceBefore,
-        //     inToken.balanceOf(address(torex)),
-        //     "The in tokens of TOREX should increase as they get used."
-        // );
-
-        // uint8 inTokenDecimals = inToken.getUnderlyingDecimals();
-        // if (inTokenDecimals < 18) {
-        //     assertLte(inToken.balanceOf(address(sut)), 1_000_000_000_000, "There is too much out token dust in the
-        // LM.");
-        // } else {
-        //     assertLte(inToken.balanceOf(address(sut)), 0, "There is too much out token dust in the LM.");
-        // }
-
-        // assertEq(outToken.balanceOf(address(sut)), 0, "No out token should be left in the LM.");
+        console2.log("TTLM - Token 0 - Reward Amount :", outToken.balanceOf(rewardAddress));
+        console2.log("TTLM - Token 1 - Reward Amount :", inToken.balanceOf(rewardAddress));
+        console2.log("TTLM - Gas used", gasBefore - gasleft());
     }
 }

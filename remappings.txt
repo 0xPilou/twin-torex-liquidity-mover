@@ -1,10 +1,12 @@
 ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
 @superfluid-finance/ethereum-contracts=lib/superfluid-protocol-monorepo/packages/ethereum-contracts
-@openzeppelin/=lib/openzeppelin-contracts/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 forge-gas-snapshot/=lib/permit2/lib/forge-gas-snapshot/src/
 permit2/=lib/permit2/
 automate/=lib/automate/contracts/
 @uniswap/v3-core=lib/v3-core
 @uniswap/v3-periphery=lib/v3-periphery
+@uniswap/v4-core=lib/uniswap-v4-core/
+@uniswap/v4-periphery=lib/uniswap-v4-periphery/
 @prb/test/=lib/prb-test/src/

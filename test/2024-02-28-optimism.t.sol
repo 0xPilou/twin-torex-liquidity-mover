@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity =0.8.15;
+pragma solidity ^0.8.24;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import { PRBTest } from "@prb/test/PRBTest.sol";
-import { console2 } from "forge-std/console2.sol";
-import { StdCheats } from "forge-std/StdCheats.sol";
-import { ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
-import { IWETH9 } from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
 
-import { ILiquidityMover, IUniswapSwapRouter, Torex, TorexConfig } from "../src/ILiquidityMover.sol";
+import { ITorex } from "../src/interfaces/superboring/ITorex.sol";
 
 import { SwapRouter02LiquidityMover } from "../src/SwapRouter02LiquidityMover.sol";
 import { Deploy } from "../script/Deploy.s.sol";
@@ -33,23 +28,23 @@ contract LiquidityMoverTests is PRBTest {
     }
 
     function test_ETHx_to_OPx() external {
-        Torex torex = Torex(0x605a2903C819CFA41ea6dD38AE2D1aAF6d01Ec33);
+        ITorex torex = ITorex(0x605a2903C819CFA41ea6dD38AE2D1aAF6d01Ec33);
         _testTorex(torex, address(sut.WETH())); // (ETHx -> OPx)
     }
 
     function test_OPx_to_ETHx() external {
-        _testTorex(Torex(0x4eA8d965e3337AFd4614d2D42ED3310AD7d0B550), address(OP)); // (OPx -> ETHx)
+        _testTorex(ITorex(0x4eA8d965e3337AFd4614d2D42ED3310AD7d0B550), address(OP)); // (OPx -> ETHx)
     }
 
     function test_OPx_to_USDCx() external {
-        _testTorex(Torex(0x2a90d7fdCb5e0506e1799B3ED852A91aC067D36e), address(OP)); // (OPx -> USDCx)
+        _testTorex(ITorex(0x2a90d7fdCb5e0506e1799B3ED852A91aC067D36e), address(OP)); // (OPx -> USDCx)
     }
 
     function test_USDCx_to_OPx() external {
-        _testTorex(Torex(0x82D28B941dB301Ea7F32d4389BBB98b1A3eA3235), address(USDC)); // (USDCx -> OPx)
+        _testTorex(ITorex(0x82D28B941dB301Ea7F32d4389BBB98b1A3eA3235), address(USDC)); // (USDCx -> OPx)
     }
 
-    function _testTorex(Torex torex, address rewardToken) internal {
+    function _testTorex(ITorex torex, address rewardToken) internal {
         sut.moveLiquidity(torex);
 
         ISuperToken outToken = torex.getConfig().outToken;

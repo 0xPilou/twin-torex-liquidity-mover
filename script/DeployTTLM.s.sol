@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity =0.8.15;
+pragma solidity ^0.8.24;
 
 import { ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { IUniswapSwapRouter } from "../src/ILiquidityMover.sol";
+import { IUniswapSwapRouter } from "../src/interfaces/IUniswapSwapRouter.sol";
 
 import { TwinTorexLiquidityMover } from "../src/TwinTorexLiquidityMover.sol";
 
