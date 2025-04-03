@@ -5,9 +5,9 @@ import "forge-std/Test.sol";
 import {SingleTorexLiquidityMover} from "src/SingleTorexLiquidityMover.sol";
 import {ITorex} from "../src/interfaces/superboring/ITorex.sol";
 import {MockTorex} from "./mock/MockTorex.sol";
-import {LiquidityMoverTest} from "./LiquidityMoverTest.t.sol";
+import {LiquidityMoverTestBase} from "./LiquidityMoverTestBase.t.sol";
 
-contract SingleTorexLiquidityMoverTest is LiquidityMoverTest {
+contract SingleTorexLiquidityMoverTest is LiquidityMoverTestBase {
     SingleTorexLiquidityMover public liquidityMover;
     MockTorex public torex;
 

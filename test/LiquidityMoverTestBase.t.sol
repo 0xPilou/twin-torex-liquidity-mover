@@ -8,7 +8,7 @@ import {ERC1820RegistryCompiled} from
     "@superfluid-finance/ethereum-contracts/contracts/libs/ERC1820RegistryCompiled.sol";
 import {ISuperToken} from "@superfluid-finance/ethereum-contracts/contracts/superfluid/SuperToken.sol";
 
-contract LiquidityMoverTest is Test {
+abstract contract LiquidityMoverTestBase is Test {
     SuperfluidFrameworkDeployer.Framework internal _sf;
     SuperfluidFrameworkDeployer internal _deployer;
 
