@@ -66,7 +66,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
             outToken.transfer(msg.sender, minOutAmount);
 
             // Transfer the inToken to the liquidity source
-            inToken.transfer(_liquiditySource, inAmount);
+            inToken.transfer(_liquiditySource, inToken.balanceOf(address(this)));
         } else if (msg.sender == _poorTorex) {
             // Transfer the outToken to the poor torex from the LM
             outToken.transfer(msg.sender, minOutAmount);
