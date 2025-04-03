@@ -4,10 +4,10 @@ pragma solidity ^0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PRBTest} from "@prb/test/PRBTest.sol";
 
-import {ITorex} from "../src/interfaces/superboring/ITorex.sol";
+import {ITorex} from "src/interfaces/superboring/ITorex.sol";
 
-import {SwapRouter02LiquidityMover} from "../src/SwapRouter02LiquidityMover.sol";
-import {Deploy} from "../script/Deploy.s.sol";
+import {SwapRouter02LiquidityMover} from "src/SwapRouter02LiquidityMover.sol";
+import {Deploy} from "script/Deploy.s.sol";
 
 import {ISuperToken} from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 

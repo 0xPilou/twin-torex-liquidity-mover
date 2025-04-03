@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import {ISETH} from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IUniswapSwapRouter} from "../src/interfaces/IUniswapSwapRouter.sol";
+import {IUniswapSwapRouter} from "src/interfaces/IUniswapSwapRouter.sol";
 
-import {TwinTorexLiquidityMover} from "../src/TwinTorexLiquidityMover.sol";
+import {UniswapV3TwinTorexLiquidityMover} from "src/UniswapV3TwinTorexLiquidityMover.sol";
 
 import {BaseScript} from "./Base.s.sol";
 
@@ -18,9 +18,9 @@ contract DeployTTLM is BaseScript {
         IERC20 erc20eth;
     }
 
-    function run() public broadcast returns (TwinTorexLiquidityMover liquidityMover) {
+    function run() public broadcast returns (UniswapV3TwinTorexLiquidityMover liquidityMover) {
         Config memory config = getConfig(block.chainid);
-        liquidityMover = new TwinTorexLiquidityMover(config.swapRouter02, config.seth, config.erc20eth);
+        liquidityMover = new UniswapV3TwinTorexLiquidityMover(config.swapRouter02, config.seth, config.erc20eth);
     }
 
     function getConfig(uint256 chainid) public pure returns (Config memory deployConfig) {

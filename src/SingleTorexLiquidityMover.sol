@@ -5,7 +5,7 @@ import { ILiquidityMover } from "./interfaces/superboring/ILiquidityMover.sol";
 import { ITorex } from "./interfaces/superboring/ITorex.sol";
 import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 
-contract SelfProvidingSingleTorexLiquidityMover is ILiquidityMover {
+contract SingleTorexLiquidityMover is ILiquidityMover {
     address private transient _liquiditySource;
     address private transient _torex;
 
