@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { PRBTest } from "@prb/test/PRBTest.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {PRBTest} from "@prb/test/PRBTest.sol";
 
-import { ITorex } from "../src/interfaces/superboring/ITorex.sol";
+import {ITorex} from "../src/interfaces/superboring/ITorex.sol";
 
-import { SwapRouter02LiquidityMover } from "../src/SwapRouter02LiquidityMover.sol";
-import { Deploy } from "../script/Deploy.s.sol";
+import {SwapRouter02LiquidityMover} from "../src/SwapRouter02LiquidityMover.sol";
+import {Deploy} from "../script/Deploy.s.sol";
 
-import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
+import {ISuperToken} from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 
 contract LiquidityMoverTests is PRBTest {
     Deploy deployScript;
@@ -22,7 +22,7 @@ contract LiquidityMoverTests is PRBTest {
     IERC20 internal constant USDC = IERC20(0x7F5c764cBc14f9669B88837ca1490cCa17c31607);
 
     function setUp() public {
-        vm.createSelectFork({ urlOrAlias: vm.envString("OPTIMISM_RPC"), blockNumber: 116_756_644 });
+        vm.createSelectFork({urlOrAlias: vm.envString("OPTIMISM_RPC"), blockNumber: 116_756_644});
         deployScript = new Deploy();
         sut = deployScript.run();
     }

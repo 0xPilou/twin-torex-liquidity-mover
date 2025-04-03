@@ -4,7 +4,7 @@
 auto_detect_solc = false
 block_timestamp = 1_680_220_800 # March 31, 2023 at 00:00 GMT
 bytecode_hash = "none"
-evm_version = "paris" # See https://www.evmdiff.com/features?name=PUSH0&kind=opcode
+evm_version = "cancun" # See https://www.evmdiff.com/features?name=PUSH0&kind=opcode
 fuzz = { runs = 1_000 }
 gas_reports = ["*"]
 libs = ["lib"]
@@ -12,7 +12,7 @@ optimizer = true
 optimizer_runs = 10_000
 out = "out"
 script = "script"
-solc = "0.8.24"
+solc = "0.8.28"
 src = "src"
 test = "test"
 remappings = [
@@ -46,16 +46,6 @@ polygon_mumbai = { key = "${API_KEY_POLYGONSCAN}", chain = 80001 }
 base = { key = "${API_KEY_BASESCAN}", chain = 8453 }
 # sepolia = { key = "${API_KEY_ETHERSCAN}" }
 # celo = { key = "${API_KEY_CELOSCAN}", chain = 42220 }
-
-[fmt]
-bracket_spacing = true
-int_types = "long"
-line_length = 120
-multiline_func_header = "all"
-number_underscore = "thousands"
-quote_style = "double"
-tab_width = 4
-wrap_comments = true
 
 [rpc_endpoints]
 # celo-alfajores = "https://alfajores-forno.celo-testnet.org"

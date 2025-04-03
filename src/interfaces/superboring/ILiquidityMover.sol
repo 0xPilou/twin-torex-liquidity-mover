@@ -1,6 +1,6 @@
 pragma solidity ^0.8.24;
 
-import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
+import {ISuperToken} from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
 
 interface ILiquidityMover {
     /**
@@ -17,7 +17,5 @@ interface ILiquidityMover {
         uint256 inAmount,
         uint256 minOutAmount,
         bytes calldata moverData
-    )
-        external
-        returns (bool);
+    ) external returns (bool);
 }

@@ -2,22 +2,22 @@
 pragma solidity ^0.8.24;
 
 /* OpenZeppelin Imports */
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IWETH9 } from "./interfaces/IWETH9.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IWETH9} from "./interfaces/IWETH9.sol";
 
 /* UniswapV3 Imports */
-import { TransferHelper } from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
-import { IV3SwapRouter } from "@uniswap/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
-import { IUniswapSwapRouter } from "./interfaces/IUniswapSwapRouter.sol";
+import {TransferHelper} from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
+import {IV3SwapRouter} from "@uniswap/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
+import {IUniswapSwapRouter} from "./interfaces/IUniswapSwapRouter.sol";
 /* Superfluid Imports */
-import { ISuperToken } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
-import { ISETH } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
+import {ISuperToken} from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperToken.sol";
+import {ISETH} from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ISETH.sol";
 
 /* Superboring Imports */
-import { ITorex, TorexConfig } from "./interfaces/superboring/ITorex.sol";
-import { ILiquidityMover } from "./interfaces/superboring/ILiquidityMover.sol";
-import { ITwapObserver } from "./interfaces/superboring/ITwapObserver.sol";
-import { IUniswapV3PoolTwapObserver } from "./interfaces/superboring/IUniswapV3PoolTwapObserver.sol";
+import {ITorex, TorexConfig} from "./interfaces/superboring/ITorex.sol";
+import {ILiquidityMover} from "./interfaces/superboring/ILiquidityMover.sol";
+import {ITwapObserver} from "./interfaces/superboring/ITwapObserver.sol";
+import {IUniswapV3PoolTwapObserver} from "./interfaces/superboring/IUniswapV3PoolTwapObserver.sol";
 
 /**
  * @title TwinTorexLiquidityMover Contract
@@ -177,7 +177,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @notice Allows the contract to receive native assets (ETH)
      * @dev Required for handling native asset operations and unwrapping WETH
      */
-    receive() external payable { }
+    receive() external payable {}
 
     /**
      * @notice Moves liquidity between two Torexes for a specific reward sent to the caller
@@ -195,12 +195,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @param rewardAddress The address that will receive the rewards
      * @param rewardAmountMinimum The minimum reward amount that must be received
      */
-    function moveLiquidityForReward(
-        ITorex torex0,
-        ITorex torex1,
-        address rewardAddress,
-        uint256 rewardAmountMinimum
-    )
+    function moveLiquidityForReward(ITorex torex0, ITorex torex1, address rewardAddress, uint256 rewardAmountMinimum)
         external
     {
         _moveLiquidity(torex0, torex1, rewardAddress, rewardAmountMinimum, bytes(""));
@@ -230,9 +225,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
         address rewardAddress,
         uint256 rewardAmountMinimum,
         bytes calldata swapPath
-    )
-        external
-    {
+    ) external {
         _moveLiquidity(torex0, torex1, rewardAddress, rewardAmountMinimum, swapPath);
     }
 
@@ -249,11 +242,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
         uint256,
         uint256 minOutAmount,
         bytes calldata moverData
-    )
-        external
-        override
-        returns (bool)
-    {
+    ) external override returns (bool) {
         // Decode the context for the liquidity movement
         Context memory ctx = abi.decode(moverData, (Context));
 
@@ -341,11 +330,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
         address rewardAddress,
         uint256 rewardAmountMinimum,
         bytes memory swapPath
-    )
-        internal
-        view
-        returns (Context memory ctx)
-    {
+    ) internal view returns (Context memory ctx) {
         ctx.richTorex = richTorex;
         ctx.poorTorex = poorTorex;
         ctx.rewardAddress = rewardAddress;
@@ -377,9 +362,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
         address rewardAddress,
         uint256 rewardAmountMinimum,
         bytes memory swapPath
-    )
-        private
-    {
+    ) private {
         // Get the liquidity estimations for the both Torexes
         (uint256 t0InAmount, uint256 t0MinOutAmount,,) = torex0.getLiquidityEstimations();
         (uint256 t1InAmount, uint256 t1MinOutAmount,,) = torex1.getLiquidityEstimations();
@@ -412,10 +395,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @return swapInToken The token to swap
      * @return swapInAmount The amount of input tokens to swap
      */
-    function _prepareInTokenForSwap(
-        ISuperToken inToken,
-        uint256 inAmount
-    )
+    function _prepareInTokenForSwap(ISuperToken inToken, uint256 inAmount)
         private
         returns (IERC20 swapInToken, uint256 swapInAmount)
     {
@@ -430,7 +410,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
         } else if (inTokenType == SuperTokenType.NativeAsset) {
             ISETH(address(inToken)).downgradeToETH(inTokenBalance);
             if (address(WETH) != address(0)) {
-                WETH.deposit{ value: address(this).balance }();
+                WETH.deposit{value: address(this).balance}();
                 swapInToken = WETH;
             } else {
                 swapInToken = ERC20ETH;
@@ -450,10 +430,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @return swapOutToken The token to swap
      * @return swapOutAmountMinimum The minimum amount of output tokens to receive
      */
-    function _prepareOutTokenForSwap(
-        ISuperToken outToken,
-        uint256 outAmount
-    )
+    function _prepareOutTokenForSwap(ISuperToken outToken, uint256 outAmount)
         private
         view
         returns (SuperTokenType outTokenType, IERC20 swapOutToken, uint256 swapOutAmountMinimum)
@@ -492,10 +469,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
         ISuperToken outToken,
         SuperTokenType outTokenType,
         address to
-    )
-        private
-        returns (uint256 outTokenAmount)
-    {
+    ) private returns (uint256 outTokenAmount) {
         if (outTokenType == SuperTokenType.Wrapper) {
             // Give Super Token maximum allowance if necessary.
             uint256 swapOutTokenBalance = swapOutToken.balanceOf(address(this));
@@ -511,7 +485,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
                 WETH.withdraw(WETH.balanceOf(address(this)));
             }
             outTokenAmount = address(this).balance;
-            ISETH(address(outToken)).upgradeByETHTo{ value: outTokenAmount }(to);
+            ISETH(address(outToken)).upgradeByETHTo{value: outTokenAmount}(to);
         } else {
             // Pure Super Token
             outTokenAmount = outToken.balanceOf(address(this));
@@ -558,11 +532,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
     function _roundUpOutAmount(
         uint256 outAmount, // 18 decimals
         uint8 underlyingTokenDecimals
-    )
-        private
-        pure
-        returns (uint256 outAmountAdjusted)
-    {
+    ) private pure returns (uint256 outAmountAdjusted) {
         if (underlyingTokenDecimals < SUPERTOKEN_DECIMALS) {
             uint256 factor = 10 ** (SUPERTOKEN_DECIMALS - underlyingTokenDecimals);
             outAmountAdjusted = ((outAmount / factor) + 1) * factor; // Effectively rounding up.
@@ -579,10 +549,7 @@ contract TwinTorexLiquidityMover is ILiquidityMover {
      * @param underlyingDecimals The decimals of the underlying token
      * @return superTokenAmount The amount of SuperToken
      */
-    function _toSuperTokenAmount(
-        uint256 underlyingAmount,
-        uint8 underlyingDecimals
-    )
+    function _toSuperTokenAmount(uint256 underlyingAmount, uint8 underlyingDecimals)
         private
         pure
         returns (uint256 superTokenAmount)
